@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.wuxianggujun.tinaide.core.treesitter"
-    compileSdk = 37
+    compileSdk = 36
     defaultConfig {
         minSdk = 28
         consumerProguardFiles("consumer-rules.pro")
