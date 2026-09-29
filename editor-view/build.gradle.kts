@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -21,6 +22,12 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
+}
+
+ktlint {
+    version.set("1.5.0")
+    android.set(true)
+    outputToConsole.set(true)
 }
 
 dependencies {

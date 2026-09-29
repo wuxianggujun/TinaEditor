@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.ktlint)
 }
 
 android {
@@ -12,4 +13,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+ktlint {
+    version.set("1.5.0")
+    android.set(true)
+    outputToConsole.set(true)
 }
