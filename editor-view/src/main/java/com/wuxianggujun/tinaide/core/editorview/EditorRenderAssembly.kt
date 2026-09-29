@@ -13,6 +13,7 @@ internal data class EditorRenderAssembly(
     val lineNumberPaint: Paint,
     val renderer: EditorRenderEngine,
     val scrollbarRenderer: EditorScrollbarRenderer,
+    val minimapRenderer: EditorMinimapRenderer,
     val selectionMagnifier: SelectionMagnifierController,
     val lineLayoutCache: EditorLineLayoutCache,
     val textScanCache: EditorTextScanCache
@@ -75,6 +76,7 @@ internal fun rememberEditorRenderAssembly(
     }
 
     val scrollbarRenderer = remember { EditorScrollbarRenderer() }
+    val minimapRenderer = remember { EditorMinimapRenderer() }
     val selectionMagnifier = remember(composeView) { SelectionMagnifierController(composeView) }
 
     return EditorRenderAssembly(
@@ -82,6 +84,7 @@ internal fun rememberEditorRenderAssembly(
         lineNumberPaint = lineNumberPaint,
         renderer = renderer,
         scrollbarRenderer = scrollbarRenderer,
+        minimapRenderer = minimapRenderer,
         selectionMagnifier = selectionMagnifier,
         lineLayoutCache = lineLayoutCache,
         textScanCache = renderer.sharedTextScanCache

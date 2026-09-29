@@ -42,8 +42,10 @@ internal fun EditorCanvasLayer(
     val selectionHandleDragCoordinator = session.selectionHandleDragCoordinator
     val cursorHandleDragCoordinator = session.cursorHandleDragCoordinator
     val scrollbarDragCoordinator = session.scrollbarDragCoordinator
+    val minimapDragCoordinator = session.minimapDragCoordinator
     val canvasGesturePipeline = session.canvasGesturePipeline
     val scrollbarRenderer = session.scrollbarRenderer
+    val minimapRenderer = session.minimapRenderer
     val scrollbarVisibilityCoordinator = session.scrollbarVisibilityCoordinator
     val view = LocalView.current
     val imeBottomInsetPx = WindowInsets.ime.getBottom(density)
@@ -84,6 +86,18 @@ internal fun EditorCanvasLayer(
     val scrollbarDragModifier = Modifier.pointerInput(state) {
         awaitPointerEventScope {
             with(scrollbarDragCoordinator) {
+                runDragLoop(
+                    canvasWidthPxProvider = { ui.canvasWidthPx },
+                    canvasHeightPxProvider = { ui.canvasHeightPx },
+                    density = density
+                )
+            }
+        }
+    }
+    // 必须排在 scrollbarDragModifier 之前：滚动条的触摸热区向左扩展 24dp，会覆盖小地图右缘。
+    val minimapDragModifier = Modifier.pointerInput(state) {
+        awaitPointerEventScope {
+            with(minimapDragCoordinator) {
                 runDragLoop(
                     canvasWidthPxProvider = { ui.canvasWidthPx },
                     canvasHeightPxProvider = { ui.canvasHeightPx },
@@ -192,6 +206,7 @@ internal fun EditorCanvasLayer(
             }
             .then(selectionHandleDragModifier)
             .then(cursorHandleDragModifier)
+            .then(minimapDragModifier)
             .then(scrollbarDragModifier)
             .then(longPressSelectionFollowModifier)
             .pointerInput(state, session.touchSlop) {
@@ -336,6 +351,24 @@ internal fun EditorCanvasLayer(
                 colorScheme = state.colorScheme,
                 activeAxis = ui.activeScrollbarDrag?.axis
             )
+
+            // 高亮版本变化时重画小地图的 token 层（Picture 缓存按版本失效）。
+            @Suppress("UNUSED_EXPRESSION")
+            state.highlightVersion
+            val minimapLayout = minimapRenderer.calculateLayout(
+                state = state,
+                canvasWidth = size.width,
+                canvasHeight = size.height,
+                density = density
+            )
+            if (minimapLayout != null) {
+                minimapRenderer.draw(
+                    drawScope = this,
+                    layout = minimapLayout,
+                    state = state,
+                    colorScheme = state.colorScheme
+                )
+            }
         }
 
         Canvas(modifier = Modifier.fillMaxSize()) {

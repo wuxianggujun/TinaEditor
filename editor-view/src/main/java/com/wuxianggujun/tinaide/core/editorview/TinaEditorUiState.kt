@@ -50,6 +50,7 @@ internal class TinaEditorUiState(
 
     var composeFocusActive by mutableStateOf(false)
     var activeScrollbarDrag by mutableStateOf<ActiveScrollbarDrag?>(null)
+    var activeMinimapDrag by mutableStateOf<ActiveMinimapDrag?>(null)
     var activeSelectionHandle by mutableStateOf<SelectionHandleKind?>(null)
     var isCursorHandleDragging by mutableStateOf(false)
 

@@ -824,6 +824,18 @@ class EditorState(
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
     }
 
+    internal fun scrollToVisualLine(visualLine: Int, center: Boolean = false) {
+        val oldX = scrollOffsetXPx
+        val oldY = scrollOffsetPx
+        val target = if (center) {
+            visualLine * lineHeightPx - viewportHeightPx / 2f
+        } else {
+            visualLine * lineHeightPx
+        }
+        scrollOffsetPx = target.coerceIn(0f, maxScrollPx())
+        emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
+    }
+
     override fun moveCursorTo(offset: Int, clearSelection: Boolean) {
         val oldCursor = cursorOffset
         val oldSelection = selectionRange

@@ -22,6 +22,7 @@ internal data class EditorSessionCoreRuntime(
     val lineNumberPaint: Paint,
     val renderer: EditorRenderEngine,
     val scrollbarRenderer: EditorScrollbarRenderer,
+    val minimapRenderer: EditorMinimapRenderer,
     val selectionMagnifier: SelectionMagnifierController,
     val lineLayoutCache: EditorLineLayoutCache,
     val textScanCache: EditorTextScanCache,
@@ -61,6 +62,7 @@ internal fun rememberEditorSessionCoreRuntime(
     val lineNumberPaint = renderAssembly.lineNumberPaint
     val renderer = renderAssembly.renderer
     val scrollbarRenderer = renderAssembly.scrollbarRenderer
+    val minimapRenderer = renderAssembly.minimapRenderer
     val selectionMagnifier = renderAssembly.selectionMagnifier
     val lineLayoutCache = renderAssembly.lineLayoutCache
     val textScanCache = renderAssembly.textScanCache
@@ -149,6 +151,7 @@ internal fun rememberEditorSessionCoreRuntime(
         lineNumberPaint = lineNumberPaint,
         renderer = renderer,
         scrollbarRenderer = scrollbarRenderer,
+        minimapRenderer = minimapRenderer,
         selectionMagnifier = selectionMagnifier,
         lineLayoutCache = lineLayoutCache,
         textScanCache = textScanCache,

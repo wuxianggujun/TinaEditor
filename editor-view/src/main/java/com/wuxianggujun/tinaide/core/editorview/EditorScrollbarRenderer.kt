@@ -110,6 +110,13 @@ internal class EditorScrollbarRenderer {
     companion object {
         private const val TRACK_MARGIN_DP = 2f
         private const val BAR_THICKNESS_DP = 5f
+
+        /**
+         * 竖直滚动条从画布右缘起占据的宽度（边距 + 条宽）。小地图据此确定自己的右边界，
+         * 两者不需要互相引用就能紧邻。
+         */
+        const val VERTICAL_BAR_OCCUPIED_WIDTH_DP = TRACK_MARGIN_DP + BAR_THICKNESS_DP
+
         private const val ACTIVE_BAR_THICKNESS_DP = 8f
         private const val TOUCH_TARGET_THICKNESS_DP = EditorScrollbarMetrics.TOUCH_TARGET_THICKNESS_DP
         private const val THUMB_TOUCH_PADDING_DP = 16f

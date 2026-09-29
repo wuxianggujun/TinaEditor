@@ -17,6 +17,7 @@ internal data class EditorSessionGestureRuntime(
     val selectionHandleDragCoordinator: SelectionHandleDragCoordinator,
     val cursorHandleDragCoordinator: CursorHandleDragCoordinator,
     val scrollbarDragCoordinator: ScrollbarDragCoordinator,
+    val minimapDragCoordinator: EditorMinimapDragCoordinator,
     val verticalFlingBehavior: FlingBehavior,
     val horizontalFlingBehavior: FlingBehavior,
     val canvasGesturePipeline: EditorCanvasGesturePipeline,
@@ -39,6 +40,7 @@ internal fun rememberEditorSessionGestureRuntime(
     val lineNumberPaint = coreRuntime.lineNumberPaint
     val renderer = coreRuntime.renderer
     val scrollbarRenderer = coreRuntime.scrollbarRenderer
+    val minimapRenderer = coreRuntime.minimapRenderer
     val selectionMagnifier = coreRuntime.selectionMagnifier
     val lineLayoutCache = coreRuntime.lineLayoutCache
     val touchDiagnostics = coreRuntime.touchDiagnostics
@@ -98,6 +100,7 @@ internal fun rememberEditorSessionGestureRuntime(
             touchSlop = touchSlop,
             shouldBlockScrollGestures = {
                 ui.activeScrollbarDrag != null ||
+                    ui.activeMinimapDrag != null ||
                     ui.activeSelectionHandle != null ||
                     ui.isCursorHandleDragging ||
                     gestureHandler.shouldBlockScrollGestures(
@@ -135,6 +138,28 @@ internal fun rememberEditorSessionGestureRuntime(
             scrollGestureCoordinator = scrollGestureCoordinator,
             gestureHandler = gestureHandler,
             onActiveDragChanged = { drag -> ui.activeScrollbarDrag = drag },
+            onContextMenuVisibilityChanged = { visible -> ui.setContextMenuVisible(visible) },
+            onTriggerScrollbarVisibility = { keepVisible -> scrollbarVisibilityCoordinator.trigger(keepVisible) },
+            cancelPendingCompletionRequest = { interactionController.cancelPendingCompletionRequest() },
+            logEditorTouch = { message, verbose -> touchDiagnostics.log(message, verbose) }
+        )
+    }
+    val minimapDragCoordinator = remember(
+        state,
+        minimapRenderer,
+        scrollGestureCoordinator,
+        gestureHandler,
+        interactionController,
+        scrollbarVisibilityCoordinator,
+        touchDiagnostics,
+        ui
+    ) {
+        EditorMinimapDragCoordinator(
+            state = state,
+            minimapRenderer = minimapRenderer,
+            scrollGestureCoordinator = scrollGestureCoordinator,
+            gestureHandler = gestureHandler,
+            onActiveDragChanged = { drag -> ui.activeMinimapDrag = drag },
             onContextMenuVisibilityChanged = { visible -> ui.setContextMenuVisible(visible) },
             onTriggerScrollbarVisibility = { keepVisible -> scrollbarVisibilityCoordinator.trigger(keepVisible) },
             cancelPendingCompletionRequest = { interactionController.cancelPendingCompletionRequest() },
@@ -333,6 +358,7 @@ internal fun rememberEditorSessionGestureRuntime(
         selectionHandleDragCoordinator = selectionHandleDragCoordinator,
         cursorHandleDragCoordinator = cursorHandleDragCoordinator,
         scrollbarDragCoordinator = scrollbarDragCoordinator,
+        minimapDragCoordinator = minimapDragCoordinator,
         verticalFlingBehavior = verticalFlingBehavior,
         horizontalFlingBehavior = horizontalFlingBehavior,
         canvasGesturePipeline = canvasGesturePipeline,

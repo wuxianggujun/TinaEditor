@@ -42,5 +42,8 @@ data class EditorConfig(
     val selectionHandleMaxRadiusPx: Float = 38f,
     val selectionHandleHitSlopRatio: Float = 1.0f,
     val selectionHandleHitMinExtraPx: Float = 26f,
-    val selectionMagnifierEnabled: Boolean = true
+    val selectionMagnifierEnabled: Boolean = true,
+
+    /** 是否在编辑器右侧显示小地图（整篇文档缩略 + 视口指示框），默认关闭。 */
+    val showMinimap: Boolean = false
 )
