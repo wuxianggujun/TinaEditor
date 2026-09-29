@@ -1,7 +1,8 @@
 # TinaEditor Kit
 
-可独立构建的 Android/Jetpack Compose 代码编辑器。此目录可作为单独仓库维护；TinaIDE
-主工程通过 `settings.gradle.kts` 的 `projectDir` 映射消费同一份源码，不复制实现。
+可独立构建的 Android/Jetpack Compose 代码编辑器，从 [TinaIDE](https://github.com/wuxianggujun/TinaIDE)
+抽离。TinaIDE 主工程把本仓库作为子目录通过 `settings.gradle.kts` 的 `projectDir`
+映射消费同一份源码，不复制实现；其他项目按下文「在其他 Android 项目中使用」接入。
 
 ## 模块
 
@@ -38,11 +39,11 @@ git submodule update --init --recursive
 
 ## 在其他 Android 项目中使用
 
-当前**推荐源码复合构建**：将 `editor-kit` 作为 Git 子模块（或同等方式）放到消费
-项目中，初始化其 Tree-sitter 子模块，然后在消费项目的 `settings.gradle.kts` 添加：
+当前**推荐源码复合构建**：把本仓库作为 Git 子模块（或同等方式）放到消费项目中，
+初始化其 Tree-sitter 子模块，然后在消费项目的 `settings.gradle.kts` 添加：
 
 ```kotlin
-includeBuild("editor-kit")
+includeBuild("TinaEditor")
 ```
 
 消费项目的 `build.gradle.kts` 添加依赖：
