@@ -58,6 +58,8 @@ class LineNumberRenderer(
         val breakpointRadius = minOf(lineHeightPx * 0.38f, digitWidth).coerceAtLeast(2f)
         val useRelative = state.useRelativeLineNumbers
         val decorations = state.gutterDecorations
+        val gitChanges = if (state.config.showGitGutter) state.gitLineChanges else emptyMap()
+        val gitStripeWidth = maxOf(3f, digitWidth * 0.3f)
 
         textPaint.color = normalColor
         textPaint.isFakeBoldText = false
@@ -84,6 +86,19 @@ class LineNumberRenderer(
 
                 val yTop = state.visualLineTopInViewport(visualLine)
                 val baselineY = yTop + lineHeightPx * 0.78f
+                val gitChange = gitChanges[line]
+                if (gitChange != null) {
+                    val stripe = gitStripeRect(gitChange, yTop, lineHeightPx, gitStripeWidth)
+                    drawScope.drawRect(
+                        color = when (gitChange) {
+                            EditorGitLineChangeType.ADDED -> scheme.gitAdded
+                            EditorGitLineChangeType.MODIFIED -> scheme.gitModified
+                            EditorGitLineChangeType.DELETED -> scheme.gitDeleted
+                        },
+                        topLeft = Offset(stripe.left, stripe.top),
+                        size = Size(stripe.width, stripe.height)
+                    )
+                }
                 val decoration = decorations[line]
                 val hasBreakpoint = decoration?.breakpoint == true
                 val hasBookmark = decoration?.bookmark == true
@@ -139,4 +154,26 @@ class LineNumberRenderer(
         cachedDigitWidth = maxWidth
         return maxWidth
     }
+}
+
+internal data class GitStripe(
+    val left: Float,
+    val top: Float,
+    val width: Float,
+    val height: Float
+)
+
+/**
+ * 计算行号栏左缘 git 色条的几何。新增/修改为整高条；删除没有新行可挂，用半高居中条区分。
+ */
+internal fun gitStripeRect(
+    change: EditorGitLineChangeType,
+    yTop: Float,
+    lineHeightPx: Float,
+    stripeWidth: Float
+): GitStripe {
+    val isDeleted = change == EditorGitLineChangeType.DELETED
+    val height = if (isDeleted) lineHeightPx * 0.5f else lineHeightPx
+    val top = if (isDeleted) yTop + (lineHeightPx - height) * 0.5f else yTop
+    return GitStripe(left = 0f, top = top, width = stripeWidth, height = height)
 }

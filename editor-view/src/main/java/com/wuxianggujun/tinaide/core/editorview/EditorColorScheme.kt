@@ -32,6 +32,10 @@ data class EditorColorScheme(
     val breakpoint: Color,
     val bookmark: Color,
     val gutterDiagnostic: Color,
+    // git gutter 色条（相对 HEAD 的逐行改动）
+    val gitAdded: Color,
+    val gitModified: Color,
+    val gitDeleted: Color,
     val foldIconExpanded: Color,
     val foldIconCollapsed: Color,
     val foldIconWarning: Color,
@@ -80,6 +84,9 @@ data class EditorColorScheme(
                 breakpoint = error,
                 bookmark = Color(0xFF2E7D32),
                 gutterDiagnostic = warning,
+                gitAdded = Color(0xFF4CAF50),
+                gitModified = Color(0xFFFFB300),
+                gitDeleted = Color(0xFFEF5350),
                 foldIconExpanded = Color(0xFF7A7A7A),
                 foldIconCollapsed = Color(0xFFB0B0B0),
                 foldIconWarning = warning,
@@ -126,6 +133,9 @@ data class EditorColorScheme(
                 breakpoint = builtinGray().breakpoint,
                 bookmark = builtinGray().bookmark,
                 gutterDiagnostic = builtinGray().gutterDiagnostic,
+                gitAdded = builtinGray().gitAdded,
+                gitModified = builtinGray().gitModified,
+                gitDeleted = builtinGray().gitDeleted,
                 foldIconExpanded = builtinGray().foldIconExpanded,
                 foldIconCollapsed = builtinGray().foldIconCollapsed,
                 foldIconWarning = builtinGray().foldIconWarning,
@@ -163,6 +173,9 @@ data class EditorColorScheme(
                 breakpoint = error,
                 bookmark = Color(0xFF2E7D32),
                 gutterDiagnostic = warning,
+                gitAdded = Color(0xFF2E7D32),
+                gitModified = Color(0xFFEF6C00),
+                gitDeleted = Color(0xFFC62828),
                 foldIconExpanded = Color(0xFF7A7A7A),
                 foldIconCollapsed = Color(0xFFB0B0B0),
                 foldIconWarning = warning,
@@ -377,6 +390,21 @@ data class EditorColorScheme(
                     "gutterDiagnostic",
                     "36",
                     "PROBLEM_WARNING"
+                ),
+                gitAdded = pick(
+                    fallback.gitAdded,
+                    "gutter.gitAdded",
+                    "git.added"
+                ),
+                gitModified = pick(
+                    fallback.gitModified,
+                    "gutter.gitModified",
+                    "git.modified"
+                ),
+                gitDeleted = pick(
+                    fallback.gitDeleted,
+                    "gutter.gitDeleted",
+                    "git.deleted"
                 ),
                 foldIconExpanded = pick(
                     fallback.foldIconExpanded,

@@ -45,5 +45,8 @@ data class EditorConfig(
     val selectionMagnifierEnabled: Boolean = true,
 
     /** 是否在编辑器右侧显示小地图（整篇文档缩略 + 视口指示框），默认关闭。 */
-    val showMinimap: Boolean = false
+    val showMinimap: Boolean = false,
+
+    /** 是否在行号栏左侧用色条标出相对 HEAD 新增/修改/删除的行（git gutter），默认关闭。 */
+    val showGitGutter: Boolean = false
 )

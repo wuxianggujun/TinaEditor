@@ -357,6 +357,9 @@ class EditorState(
         }
     val gutterDecorations = mutableStateMapOf<Int, GutterDecoration>()
 
+    /** 宿主计算的“相对 HEAD 的逐行改动”（行号栏 git 色条）。整份重算并原子替换，可为空。 */
+    var gitLineChanges by mutableStateOf<Map<Int, EditorGitLineChangeType>>(emptyMap())
+
     private val wordWrapLayoutCache = EditorWordWrapLayoutCache()
 
     fun clearSemanticTokens() {

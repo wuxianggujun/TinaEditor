@@ -130,3 +130,6 @@ data class GutterDecoration(
     val hasDiagnostic: Boolean = false,
     val foldable: Boolean = false
 )
+
+/** 行号栏 git 修改指示色条的类型（相对 HEAD）。宿主计算后写入 [EditorState.gitLineChanges]。 */
+enum class EditorGitLineChangeType { ADDED, MODIFIED, DELETED }
