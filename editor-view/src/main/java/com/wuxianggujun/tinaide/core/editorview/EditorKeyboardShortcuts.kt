@@ -301,22 +301,14 @@ internal fun handleEditorShortcut(
 
         ctrlShortcutPressed && event.key == Key.Backspace -> {
             onBeforeTextEdit()
-            deleteWordRange(
-                state = state,
-                startOffset = previousWordBoundaryOffset(state),
-                endOffset = state.cursorOffset
-            )
+            deleteWordAtSelections(state = state, backwards = true)
             onAfterTextEdit()
             true
         }
 
         ctrlShortcutPressed && event.key == Key.Delete -> {
             onBeforeTextEdit()
-            deleteWordRange(
-                state = state,
-                startOffset = state.cursorOffset,
-                endOffset = nextWordBoundaryOffset(state)
-            )
+            deleteWordAtSelections(state = state, backwards = false)
             onAfterTextEdit()
             true
         }
@@ -403,20 +395,40 @@ internal fun handleEditorShortcut(
 }
 
 private fun selectNextOccurrenceForCtrlD(state: EditorState): Boolean {
-    val selected = state.selectedText()
-    if (selected.isNullOrEmpty()) {
+    val currentRange = state.selectionRange?.takeUnless { it.isEmpty }
+    if (currentRange == null) {
+        if (state.hasMultipleSelections) return false
         val position = state.cursorPosition
         return state.selectWord(position.line, position.column)
     }
-    val currentRange = state.selectionRange?.takeUnless { it.isEmpty } ?: return false
+    val selected = state.textBuffer.substring(currentRange.start, currentRange.end)
+    if (selected.isNullOrEmpty()) {
+        return false
+    }
     val occurrence = findNextOccurrence(
         state = state,
         query = selected,
-        currentRange = currentRange
+        currentRange = currentRange,
+        excludedRanges = state.selectionSet.selections
     ) ?: return false
-    state.selectRange(
-        startOffset = occurrence.startOffset,
-        endOffset = occurrence.endOffset
+
+    if (!state.hasMultipleSelections) {
+        state.selectRange(
+            startOffset = occurrence.startOffset,
+            endOffset = occurrence.endOffset
+        )
+        return true
+    }
+
+    state.applySelectionSet(
+        selectionSet = EditorSelectionSet.of(
+            primary = state.selectionSet.primary,
+            secondary = state.selectionSet.secondary + OffsetRange(
+                anchor = occurrence.startOffset,
+                caret = occurrence.endOffset
+            )
+        ),
+        ensureVisible = true
     )
     return true
 }
@@ -429,7 +441,8 @@ private data class TextOccurrence(
 private fun findNextOccurrence(
     state: EditorState,
     query: String,
-    currentRange: OffsetRange
+    currentRange: OffsetRange,
+    excludedRanges: List<OffsetRange> = listOf(currentRange)
 ): TextOccurrence? {
     if (query.isEmpty() || query.length > state.textBuffer.length) return null
     val fromOffset = currentRange.end.coerceIn(0, state.textBuffer.length)
@@ -439,7 +452,7 @@ private fun findNextOccurrence(
         query = query,
         startOffset = fromOffset,
         endOffset = state.textBuffer.length,
-        currentRange = currentRange,
+        excludedRanges = excludedRanges,
         wholeWord = wordQuery
     )
     if (forward != null) return forward
@@ -448,7 +461,7 @@ private fun findNextOccurrence(
         query = query,
         startOffset = 0,
         endOffset = fromOffset,
-        currentRange = currentRange,
+        excludedRanges = excludedRanges,
         wholeWord = wordQuery
     )
 }
@@ -458,7 +471,7 @@ private fun findOccurrenceInRange(
     query: String,
     startOffset: Int,
     endOffset: Int,
-    currentRange: OffsetRange,
+    excludedRanges: List<OffsetRange>,
     wholeWord: Boolean
 ): TextOccurrence? {
     val safeStart = startOffset.coerceIn(0, state.textBuffer.length)
@@ -470,7 +483,7 @@ private fun findOccurrenceInRange(
             word = query,
             startOffset = safeStart,
             endOffset = safeEnd,
-            currentRange = currentRange
+            excludedRanges = excludedRanges
         )
     } else {
         findExactOccurrenceInRange(
@@ -478,7 +491,7 @@ private fun findOccurrenceInRange(
             query = query,
             startOffset = safeStart,
             endOffset = safeEnd,
-            currentRange = currentRange
+            excludedRanges = excludedRanges
         )
     }
 }
@@ -488,7 +501,7 @@ private fun findWholeWordOccurrenceInRange(
     word: String,
     startOffset: Int,
     endOffset: Int,
-    currentRange: OffsetRange
+    excludedRanges: List<OffsetRange>
 ): TextOccurrence? {
     val startLine = state.textBuffer.offsetToPosition(startOffset).line
     val endLine = state.textBuffer.offsetToPosition(endOffset).line
@@ -512,7 +525,7 @@ private fun findWholeWordOccurrenceInRange(
                 startOffset = lineStartOffset + column,
                 endOffset = lineStartOffset + column + word.length
             )
-            if (!occurrence.sameRangeAs(currentRange)) return occurrence
+            if (excludedRanges.none(occurrence::sameRangeAs)) return occurrence
         }
     }
     return null
@@ -523,7 +536,7 @@ private fun findExactOccurrenceInRange(
     query: String,
     startOffset: Int,
     endOffset: Int,
-    currentRange: OffsetRange
+    excludedRanges: List<OffsetRange>
 ): TextOccurrence? {
     val documentText = state.textBuffer.substring(0, state.textBuffer.length)
     var searchIndex = startOffset
@@ -534,7 +547,7 @@ private fun findExactOccurrenceInRange(
             startOffset = matchIndex,
             endOffset = matchIndex + query.length
         )
-        if (!occurrence.sameRangeAs(currentRange)) return occurrence
+        if (excludedRanges.none(occurrence::sameRangeAs)) return occurrence
         searchIndex = (matchIndex + 1).coerceAtMost(endOffset)
     }
     return null
@@ -726,8 +739,11 @@ private enum class WordBoundaryCharKind {
     Other
 }
 
-private fun previousWordBoundaryOffset(state: EditorState): Int {
-    var target = state.cursorOffset.coerceIn(0, state.textBuffer.length)
+private fun previousWordBoundaryOffset(
+    state: EditorState,
+    fromOffset: Int = state.cursorOffset
+): Int {
+    var target = fromOffset.coerceIn(0, state.textBuffer.length)
     if (target <= 0) return 0
     while (target > 0 && charKindBefore(state, target) == WordBoundaryCharKind.Whitespace) {
         target--
@@ -740,8 +756,11 @@ private fun previousWordBoundaryOffset(state: EditorState): Int {
     return target
 }
 
-private fun nextWordBoundaryOffset(state: EditorState): Int {
-    var target = state.cursorOffset.coerceIn(0, state.textBuffer.length)
+private fun nextWordBoundaryOffset(
+    state: EditorState,
+    fromOffset: Int = state.cursorOffset
+): Int {
+    var target = fromOffset.coerceIn(0, state.textBuffer.length)
     val documentLength = state.textBuffer.length
     if (target >= documentLength) return documentLength
     while (target < documentLength && charKindAt(state, target) == WordBoundaryCharKind.Whitespace) {
@@ -753,6 +772,42 @@ private fun nextWordBoundaryOffset(state: EditorState): Int {
         target++
     }
     return target
+}
+
+private fun deleteWordAtSelections(
+    state: EditorState,
+    backwards: Boolean
+) {
+    if (state.hasMultipleSelections) {
+        editorDeleteSurroundingMultipleSelections(
+            state = state,
+            reason = if (backwards) "deleteWordBackward" else "deleteWordForward",
+            resolveRange = { cursorOffset ->
+                if (backwards) {
+                    previousWordBoundaryOffset(state, cursorOffset) to cursorOffset
+                } else {
+                    cursorOffset to nextWordBoundaryOffset(state, cursorOffset)
+                }
+            }
+        )
+        return
+    }
+
+    val startOffset = if (backwards) {
+        previousWordBoundaryOffset(state)
+    } else {
+        state.cursorOffset
+    }
+    val endOffset = if (backwards) {
+        state.cursorOffset
+    } else {
+        nextWordBoundaryOffset(state)
+    }
+    deleteWordRange(
+        state = state,
+        startOffset = startOffset,
+        endOffset = endOffset
+    )
 }
 
 private fun deleteWordRange(

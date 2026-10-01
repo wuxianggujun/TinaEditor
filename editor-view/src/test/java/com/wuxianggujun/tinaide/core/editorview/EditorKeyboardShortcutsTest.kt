@@ -587,6 +587,50 @@ class EditorKeyboardShortcutsTest {
     }
 
     @Test
+    fun handleEditorShortcut_shouldDeletePreviousWordAtEveryCursor() {
+        val state = createState("one two three")
+        state.moveCursorTo(3)
+        assertThat(state.addCursorAt(7)).isTrue()
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_DEL,
+                metaState = AndroidKeyEvent.META_CTRL_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("  three")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(1, 1)
+        ).inOrder()
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldDeleteNextWordAtEveryCursor() {
+        val state = createState("one two three")
+        state.moveCursorTo(0)
+        assertThat(state.addCursorAt(4)).isTrue()
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_FORWARD_DEL,
+                metaState = AndroidKeyEvent.META_CTRL_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("  three")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(1, 1)
+        ).inOrder()
+    }
+
+    @Test
     fun handleEditorShortcut_shouldSelectCurrentWordWithCtrlD() {
         val state = createState("alpha beta")
         state.moveCursorTo(2)
@@ -652,6 +696,34 @@ class EditorKeyboardShortcutsTest {
 
         assertThat(consumed).isTrue()
         assertThat(state.selectionRange).isEqualTo(OffsetRange(anchor = 8, caret = 11))
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldAddNextOccurrenceWithoutDroppingExistingSelections() {
+        val state = createState("foo bar foo foo")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(0, 3),
+                secondary = listOf(OffsetRange(8, 11))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_D,
+                metaState = AndroidKeyEvent.META_CTRL_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 3),
+            OffsetRange(8, 11),
+            OffsetRange(12, 15)
+        ).inOrder()
+        assertThat(state.selectionSet.primary).isEqualTo(OffsetRange(0, 3))
     }
 
     @Test
