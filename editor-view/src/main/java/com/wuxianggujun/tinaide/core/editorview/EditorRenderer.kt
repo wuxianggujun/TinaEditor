@@ -207,6 +207,13 @@ internal class EditorRenderer(
                         lineLayoutCache = lineLayoutCache,
                         foldEndLineInfo = foldEndLineInfo
                     )
+                    cursorRenderer.drawSecondaryCursors(
+                        drawScope = this,
+                        frameContext = frameContext,
+                        textStartX = textStartX,
+                        textPaint = textPaint,
+                        lineLayoutCache = lineLayoutCache
+                    )
                 }
                 cursorRenderer.drawCursorHandle(
                     drawScope = this,

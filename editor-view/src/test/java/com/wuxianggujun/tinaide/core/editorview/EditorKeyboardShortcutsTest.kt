@@ -353,6 +353,42 @@ class EditorKeyboardShortcutsTest {
     }
 
     @Test
+    fun handleEditorShortcut_shouldAddSecondaryCursorWithCtrlAltDirection() {
+        val state = createState("one\ntwo\nthree")
+        state.moveCursorTo(state.textBuffer.positionToOffset(1, 1))
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_DPAD_UP,
+                metaState = AndroidKeyEvent.META_CTRL_ON or AndroidKeyEvent.META_ALT_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(1, 1),
+            OffsetRange(5, 5)
+        ).inOrder()
+        assertThat(state.selectionSet.primary).isEqualTo(OffsetRange(5, 5))
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldExitMultiCursorModeWithEscape() {
+        val state = createState("abc")
+        state.moveCursorTo(0)
+        state.addCursorAt(2)
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(keyCode = AndroidKeyEvent.KEYCODE_ESCAPE)
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.hasMultipleSelections).isFalse()
+    }
+
+    @Test
     fun handleEditorShortcut_shouldMoveCursorByPageDown() {
         val state = createState("a\nb\nc\nd\ne")
         state.updateMetrics(

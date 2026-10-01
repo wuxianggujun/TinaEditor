@@ -33,6 +33,8 @@ internal fun handleEditorShortcut(
 ): Boolean {
     if (event.type != KeyEventType.KeyDown) return false
     val ctrlShortcutPressed = event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed
+    val ctrlAltShortcutPressed =
+        event.isCtrlPressed && event.isAltPressed && !event.isMetaPressed && !event.isShiftPressed
     val altShortcutPressed =
         event.isAltPressed && !event.isCtrlPressed && !event.isMetaPressed && !event.isShiftPressed
     if (event.requestsKeyboardContextMenu()) {
@@ -85,6 +87,11 @@ internal fun handleEditorShortcut(
 
     if (event.key == Key.Escape && state.signatureHelpUiState !is SignatureHelpUiState.Hidden) {
         onDismissSignatureHelp()
+        return true
+    }
+
+    if (event.key == Key.Escape && state.hasMultipleSelections) {
+        state.clearSecondaryCursors()
         return true
     }
 
@@ -220,6 +227,18 @@ internal fun handleEditorShortcut(
         }
     }
     return when {
+        ctrlAltShortcutPressed && event.key == Key.DirectionUp -> {
+            val changed = state.addCursorVertically(direction = -1)
+            if (changed) onAfterTextEdit()
+            true
+        }
+
+        ctrlAltShortcutPressed && event.key == Key.DirectionDown -> {
+            val changed = state.addCursorVertically(direction = 1)
+            if (changed) onAfterTextEdit()
+            true
+        }
+
         altShortcutPressed && event.key == Key.DirectionUp -> {
             onBeforeTextEdit()
             val changed = moveSelectedLines(

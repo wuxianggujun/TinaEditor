@@ -41,6 +41,35 @@ internal class CursorRenderer {
         )
     }
 
+    fun drawSecondaryCursors(
+        drawScope: DrawScope,
+        frameContext: EditorRenderFrameContext,
+        textStartX: Float,
+        textPaint: Paint,
+        lineLayoutCache: EditorLineLayoutCache
+    ) {
+        val state = frameContext.state
+        if (!state.isFocused) return
+        state.selectionSet.secondary.forEach { selection ->
+            if (!selection.isEmpty) return@forEach
+            val layout = resolveCursorHandleLayout(
+                state = state,
+                textStartX = textStartX,
+                textPaint = textPaint,
+                lineLayoutCache = lineLayoutCache,
+                lineTextProvider = frameContext::lineText,
+                textScanCache = frameContext.textScanCache,
+                cursorOffset = selection.caret
+            ) ?: return@forEach
+            drawScope.drawLine(
+                color = state.colorScheme.cursor.copy(alpha = 0.78f),
+                start = Offset(layout.cursorX, layout.cursorTop),
+                end = Offset(layout.cursorX, layout.cursorBottom),
+                strokeWidth = 1.5f
+            )
+        }
+    }
+
     fun drawCursorHandle(
         drawScope: DrawScope,
         frameContext: EditorRenderFrameContext,

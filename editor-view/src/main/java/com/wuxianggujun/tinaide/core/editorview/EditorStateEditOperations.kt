@@ -9,6 +9,9 @@ import com.wuxianggujun.tinaide.core.textengine.TextScanKernel
 internal fun editorInsert(state: EditorState, text: String) {
     if (text.isEmpty()) return
     state.traceSlowOperation("insert") {
+        if (editorReplaceMultipleSelections(state, text, reason = "insert")) {
+            return@traceSlowOperation
+        }
         val selection = state.selectionRange
         val replaceStart = selection?.start ?: state.cursorOffset
         val replaceEnd = selection?.end ?: state.cursorOffset
@@ -146,6 +149,7 @@ private fun applySynchronizedSnippetGroupReplace(
 
 internal fun editorBackspace(state: EditorState) {
     state.traceSlowOperation("backspace") {
+        if (editorBackspaceMultipleSelections(state)) return@traceSlowOperation
         val selRange = state.selectionRange
         if (selRange != null && !selRange.isEmpty) {
             if (applySynchronizedSnippetGroupReplace(
@@ -264,6 +268,7 @@ internal fun editorBackspace(state: EditorState) {
 
 internal fun editorDeleteForward(state: EditorState) {
     state.traceSlowOperation("deleteForward") {
+        if (editorDeleteForwardMultipleSelections(state)) return@traceSlowOperation
         val selRange = state.selectionRange
         if (selRange != null && !selRange.isEmpty) {
             if (applySynchronizedSnippetGroupReplace(
@@ -307,6 +312,9 @@ internal fun editorDeleteForward(state: EditorState) {
 }
 
 internal fun editorReplaceSelection(state: EditorState, replacement: String): Boolean {
+    if (editorReplaceMultipleSelections(state, replacement, reason = "replaceSelection")) {
+        return true
+    }
     val range = state.selectionRange
     val hasSelection = range != null && !range.isEmpty
     val startOffset = if (hasSelection) range!!.start else state.cursorOffset
@@ -365,6 +373,18 @@ internal fun editorReplaceRange(
     return state.traceSlowOperation("replaceRange") {
         val safeStart = startOffset.coerceIn(0, state.textBuffer.length)
         val safeEnd = endOffset.coerceIn(safeStart, state.textBuffer.length)
+        if (
+            state.hasMultipleSelections &&
+            safeStart == state.selectionSet.primary.start &&
+            safeEnd == state.selectionSet.primary.end
+        ) {
+            return@traceSlowOperation editorReplaceMultipleSelections(
+                state = state,
+                replacement = replacement,
+                reason = "replaceRange",
+                primaryCaretOverride = cursorOffsetAfterEdit
+            )
+        }
         if (safeStart == safeEnd && replacement.isEmpty()) {
             cursorOffsetAfterEdit?.let(state::moveCursorTo)
             return@traceSlowOperation false
@@ -1156,6 +1176,24 @@ private fun restoreUndoRedoSelection(
         end = selection.caret
     )
     val restored = OffsetRange(anchor = anchor, caret = caret)
+    if (selection.additionalSelections.isNotEmpty()) {
+        val secondary = selection.additionalSelections.map { additional ->
+            val (additionalAnchor, additionalCaret) = snapSelectionToEditorUnitBoundaries(
+                textBuffer = state.textBuffer,
+                start = additional.anchor,
+                end = additional.caret
+            )
+            OffsetRange(anchor = additionalAnchor, caret = additionalCaret)
+        }
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = restored,
+                secondary = secondary
+            ),
+            ensureVisible = true
+        )
+        return
+    }
     val oldSelection = state.selectionRange
     state.selectionRange = restored
     state.moveCursorTo(restored.caret, clearSelection = false)

@@ -79,6 +79,15 @@ class EditorState(
             markObservableStateChanged()
         }
 
+    val selectionSet: EditorSelectionSet
+        get() = EditorSelectionSet.of(
+            primary = selectionRange ?: OffsetRange(cursorOffset, cursorOffset),
+            secondary = documentState.secondarySelections
+        ).normalized(textBuffer.length)
+
+    val hasMultipleSelections: Boolean
+        get() = selectionSet.isMultiCursor
+
     private var cachedCursorOffset = -1
     private var cachedCursorVersion = -1L
     private var cachedCursorPosition = Position(0, 0)
@@ -190,6 +199,7 @@ class EditorState(
             contentStartXPx = 0f,
             lineHeightPx = 1f,
             charWidthPx = 1f,
+            selectionSet = EditorSelectionSet.single(),
         )
     )
     val observableState: StateFlow<EditorObservableState> = _observableState.asStateFlow()
@@ -946,8 +956,12 @@ class EditorState(
     override fun moveCursorTo(offset: Int, clearSelection: Boolean) {
         val oldCursor = cursorOffset
         val oldSelection = selectionRange
+        val oldSelectionSet = selectionSet
         val oldX = scrollOffsetXPx
         val oldY = scrollOffsetPx
+        if (clearSelection && documentState.secondarySelections.isNotEmpty()) {
+            documentState.secondarySelections = emptyList()
+        }
         val safeOffset = snapOffsetToEditorUnitBoundary(
             textBuffer = textBuffer,
             offset = offset,
@@ -968,10 +982,81 @@ class EditorState(
         if (oldCursor != cursorOffset) {
             emitEvent(EditorEvent.CursorMoved(oldCursor, cursorOffset))
         }
-        if (oldSelection != selectionRange) {
+        if (oldSelection != selectionRange || oldSelectionSet.secondary != selectionSet.secondary) {
             emitEvent(EditorEvent.SelectionChanged(selectionRange))
         }
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
+    }
+
+    /** Add a collapsed secondary cursor without changing the primary selection. */
+    fun addCursorAt(offset: Int): Boolean {
+        val safeOffset = snapOffsetToEditorUnitBoundary(
+            textBuffer = textBuffer,
+            offset = offset,
+            preferAfter = true
+        )
+        val current = selectionSet
+        if (current.selections.any { it.isEmpty && it.caret == safeOffset }) return false
+        val next = EditorSelectionSet.of(
+            primary = current.primary,
+            secondary = current.secondary + OffsetRange(safeOffset, safeOffset)
+        )
+        applySelectionSet(next, ensureVisible = false)
+        return true
+    }
+
+    /** Add a cursor on the nearest available line in the requested vertical direction. */
+    fun addCursorVertically(direction: Int): Boolean {
+        if (direction == 0) return false
+        val current = selectionSet
+        val edgeSelection = if (direction < 0) {
+            current.selections.minByOrNull { textBuffer.offsetToPosition(it.caret).line }
+        } else {
+            current.selections.maxByOrNull { textBuffer.offsetToPosition(it.caret).line }
+        } ?: return false
+        val edgePosition = textBuffer.offsetToPosition(edgeSelection.caret)
+        val targetLine = (edgePosition.line + direction)
+            .coerceIn(0, (textBuffer.lineCount - 1).coerceAtLeast(0))
+        if (targetLine == edgePosition.line) return false
+        val targetColumn = edgePosition.column.coerceAtMost(textBuffer.getLine(targetLine).length)
+        return addCursorAt(textBuffer.positionToOffset(targetLine, targetColumn))
+    }
+
+    fun clearSecondaryCursors(): Boolean {
+        if (documentState.secondarySelections.isEmpty()) return false
+        documentState.secondarySelections = emptyList()
+        markObservableStateChanged()
+        emitEvent(EditorEvent.SelectionChanged(selectionRange))
+        return true
+    }
+
+    internal fun applySelectionSet(
+        selectionSet: EditorSelectionSet,
+        ensureVisible: Boolean
+    ) {
+        val oldCursor = cursorOffset
+        val oldSelection = selectionRange
+        val oldSelectionSet = this.selectionSet
+        val normalized = selectionSet.normalized(textBuffer.length)
+        val primary = normalized.primary
+        documentState.secondarySelections = normalized.secondary
+        documentState.cursorOffset = primary.caret
+        documentState.selectionRange = primary.takeUnless(OffsetRange::isEmpty)
+        if (ensureVisible) {
+            val position = textBuffer.offsetToPosition(primary.caret)
+            revealLineIfFolded(position.line)
+            ensureCursorVisible(position.line, position.column)
+        }
+        if (isFocused) {
+            cursorBlinkVisible = true
+        }
+        markObservableStateChanged()
+        if (oldCursor != cursorOffset) {
+            emitEvent(EditorEvent.CursorMoved(oldCursor, cursorOffset))
+        }
+        if (oldSelection != selectionRange || oldSelectionSet.secondary != normalized.secondary) {
+            emitEvent(EditorEvent.SelectionChanged(selectionRange))
+        }
     }
 
     fun ensureCursorVisible() {
@@ -1224,8 +1309,10 @@ class EditorState(
     ) {
         val oldCursor = cursorOffset
         val oldSelection = selectionRange
+        val oldSelectionSet = selectionSet
         val oldX = scrollOffsetXPx
         val oldY = scrollOffsetPx
+        documentState.secondarySelections = emptyList()
         val (safeStart, safeEnd) = snapSelectionToEditorUnitBoundaries(
             textBuffer = textBuffer,
             start = startOffset,
@@ -1240,7 +1327,7 @@ class EditorState(
         if (oldCursor != cursorOffset) {
             emitEvent(EditorEvent.CursorMoved(oldCursor, cursorOffset))
         }
-        if (oldSelection != selectionRange) {
+        if (oldSelection != selectionRange || oldSelectionSet.secondary != selectionSet.secondary) {
             emitEvent(EditorEvent.SelectionChanged(selectionRange))
         }
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
@@ -1259,13 +1346,15 @@ class EditorState(
         if (textBuffer.length <= 0) return
         val oldCursor = cursorOffset
         val oldSelection = selectionRange
+        val oldSelectionSet = selectionSet
         val endOffset = textBuffer.length
+        documentState.secondarySelections = emptyList()
         selectionRange = OffsetRange(0, endOffset)
         cursorOffset = endOffset
         if (oldCursor != cursorOffset) {
             emitEvent(EditorEvent.CursorMoved(oldCursor, cursorOffset))
         }
-        if (oldSelection != selectionRange) {
+        if (oldSelection != selectionRange || oldSelectionSet.secondary != selectionSet.secondary) {
             emitEvent(EditorEvent.SelectionChanged(selectionRange))
         }
     }
@@ -1285,8 +1374,10 @@ class EditorState(
 
     fun clearSelection() {
         val oldSelection = selectionRange
+        val hadSecondaryCursors = documentState.secondarySelections.isNotEmpty()
+        documentState.secondarySelections = emptyList()
         selectionRange = null
-        if (oldSelection != selectionRange) {
+        if (oldSelection != selectionRange || hadSecondaryCursors) {
             emitEvent(EditorEvent.SelectionChanged(selectionRange))
         }
     }
@@ -1341,11 +1432,13 @@ class EditorState(
     fun startSelection(anchorOffset: Int) {
         val oldCursor = cursorOffset
         val oldSelection = selectionRange
+        val oldSelectionSet = selectionSet
         val safe = snapOffsetToEditorUnitBoundary(
             textBuffer = textBuffer,
             offset = anchorOffset,
             preferAfter = true
         )
+        documentState.secondarySelections = emptyList()
         selectionRange = OffsetRange(safe, safe)
         cursorOffset = safe
         if (isFocused) {
@@ -1354,7 +1447,7 @@ class EditorState(
         if (oldCursor != cursorOffset) {
             emitEvent(EditorEvent.CursorMoved(oldCursor, cursorOffset))
         }
-        if (oldSelection != selectionRange) {
+        if (oldSelection != selectionRange || oldSelectionSet.secondary != selectionSet.secondary) {
             emitEvent(EditorEvent.SelectionChanged(selectionRange))
         }
     }
@@ -1362,8 +1455,10 @@ class EditorState(
     fun updateSelectionTo(offset: Int) {
         val oldCursor = cursorOffset
         val oldSelection = selectionRange
+        val oldSelectionSet = selectionSet
         val oldX = scrollOffsetXPx
         val oldY = scrollOffsetPx
+        documentState.secondarySelections = emptyList()
         val current = selectionRange
         val clampedOffset = offset.coerceIn(0, textBuffer.length)
         val anchor = current?.anchor ?: cursorOffset
@@ -1386,7 +1481,7 @@ class EditorState(
         if (oldCursor != cursorOffset) {
             emitEvent(EditorEvent.CursorMoved(oldCursor, cursorOffset))
         }
-        if (oldSelection != selectionRange) {
+        if (oldSelection != selectionRange || oldSelectionSet.secondary != selectionSet.secondary) {
             emitEvent(EditorEvent.SelectionChanged(selectionRange))
         }
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
@@ -1771,6 +1866,7 @@ class EditorState(
             val normalizedRange = OffsetRange(anchor = anchor, caret = caret)
             if (selectionRange != normalizedRange) selectionRange = normalizedRange
             if (cursorOffset != caret) cursorOffset = caret
+            normalizeSecondarySelections()
             return
         }
 
@@ -1780,6 +1876,15 @@ class EditorState(
             preferAfter = true
         )
         if (cursorOffset != normalizedCursor) cursorOffset = normalizedCursor
+        normalizeSecondarySelections()
+    }
+
+    private fun normalizeSecondarySelections() {
+        if (documentState.secondarySelections.isEmpty()) return
+        val normalizedSet = selectionSet.normalized(textBuffer.length)
+        if (documentState.secondarySelections != normalizedSet.secondary) {
+            documentState.secondarySelections = normalizedSet.secondary
+        }
     }
 
     internal fun emitEvent(event: EditorEvent) {
@@ -1808,6 +1913,7 @@ class EditorState(
         contentStartXPx = contentStartXPx,
         lineHeightPx = lineHeightPx,
         charWidthPx = charWidthPx,
+        selectionSet = selectionSet,
     )
 
     private inline fun <T> withObservableStateBatch(block: () -> T): T {

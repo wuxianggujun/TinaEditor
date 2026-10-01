@@ -95,13 +95,23 @@ data class TextEditCursorSnapshot(
 
 data class TextSelectionSnapshot(
     val anchor: Int,
-    val caret: Int
+    val caret: Int,
+    val additionalSelections: List<TextSelectionRangeSnapshot> = emptyList()
 ) {
     init {
         require(anchor >= 0) { "Selection anchor must not be negative" }
         require(caret >= 0) { "Selection caret must not be negative" }
+        additionalSelections.forEach { selection ->
+            require(selection.anchor >= 0) { "Additional selection anchor must not be negative" }
+            require(selection.caret >= 0) { "Additional selection caret must not be negative" }
+        }
     }
 }
+
+data class TextSelectionRangeSnapshot(
+    val anchor: Int,
+    val caret: Int
+)
 
 fun interface TextChangeListener {
     fun onTextChanged(change: TextChange)

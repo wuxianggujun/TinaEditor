@@ -16,4 +16,5 @@ data class EditorObservableState(
     val contentStartXPx: Float,
     val lineHeightPx: Float,
     val charWidthPx: Float,
+    val selectionSet: EditorSelectionSet = EditorSelectionSet.single(),
 )

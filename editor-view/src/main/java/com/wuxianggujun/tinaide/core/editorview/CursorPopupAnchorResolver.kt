@@ -51,15 +51,18 @@ internal fun resolveCursorVisualAnchor(
     lineLayoutCache: EditorLineLayoutCache,
     lineTextProvider: (Int) -> String,
     foldEndLineInfo: FoldEndLineCursorInfo? = null,
-    textScanCache: EditorTextScanCache
+    textScanCache: EditorTextScanCache,
+    cursorOffset: Int = state.cursorOffset
 ): CursorVisualAnchor? {
     if (state.lineHeightPx <= 0f) return null
     if (state.textBuffer.lineCount <= 0) return null
 
     val maxLine = state.textBuffer.lineCount - 1
-    val line = state.cursorPosition.line.coerceIn(0, maxLine)
+    val safeCursorOffset = cursorOffset.coerceIn(0, state.textBuffer.length)
+    val cursorPosition = state.textBuffer.offsetToPosition(safeCursorOffset)
+    val line = cursorPosition.line.coerceIn(0, maxLine)
     val lineText = lineTextProvider(line)
-    val column = state.cursorPosition.column.coerceIn(0, lineText.length)
+    val column = cursorPosition.column.coerceIn(0, lineText.length)
     val visualLine = state.visualLineForPosition(line, column)
     val lineTop = state.visualLineTopInViewport(visualLine)
     return CursorVisualAnchor(

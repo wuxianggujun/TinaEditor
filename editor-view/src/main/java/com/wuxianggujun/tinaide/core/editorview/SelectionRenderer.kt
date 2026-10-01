@@ -55,58 +55,60 @@ internal class SelectionRenderer {
         lineLayoutCache: EditorLineLayoutCache
     ) {
         val state = frameContext.state
-        val range = state.selectionRange ?: return
-        if (range.isEmpty) return
         val visibleVisualLines = state.visibleLines
         if (visibleVisualLines.isEmpty()) return
-        val endpoints = resolveSelectionEndpoints(state, range)
         val textVersion = frameContext.textVersion
         val selectionBackground = state.colorScheme.selectionBackground
         val lineHeightPx = state.lineHeightPx
-        var cachedLine = -1
-        var cachedLineText = ""
-        var cachedPrefixLayout: EditorLineLayoutCache.PrefixLayout? = null
-        for (visualLine in visibleVisualLines) {
-            val line = state.docLineForVisualLine(visualLine)
-            if (line < endpoints.startLine || line > endpoints.endLine) continue
-            if (line >= state.textBuffer.lineCount) continue
-            if (line != cachedLine) {
-                cachedLine = line
-                cachedLineText = frameContext.lineText(line)
-                cachedPrefixLayout = null
-            }
-            val lineText = cachedLineText
-            val visualStartColumn = state.visualLineStartColumn(visualLine)
-            val visualEndColumn = state.visualLineEndColumn(visualLine).coerceIn(visualStartColumn, lineText.length)
-            val lineStartCol = (if (line == endpoints.startLine) endpoints.startColumn else 0)
-                .coerceIn(0, lineText.length)
-            val lineEndCol = (if (line == endpoints.endLine) endpoints.endColumn else lineText.length)
-                .coerceIn(lineStartCol, lineText.length)
-            val startColumn = maxOf(lineStartCol, visualStartColumn)
-            val endColumn = minOf(lineEndCol, visualEndColumn)
-            if (endColumn <= startColumn) continue
+        for (selection in state.selectionSet.selections) {
+            if (selection.isEmpty) continue
+            val endpoints = resolveSelectionEndpoints(state, selection)
+            var cachedLine = -1
+            var cachedLineText = ""
+            var cachedPrefixLayout: EditorLineLayoutCache.PrefixLayout? = null
+            for (visualLine in visibleVisualLines) {
+                val line = state.docLineForVisualLine(visualLine)
+                if (line < endpoints.startLine || line > endpoints.endLine) continue
+                if (line >= state.textBuffer.lineCount) continue
+                if (line != cachedLine) {
+                    cachedLine = line
+                    cachedLineText = frameContext.lineText(line)
+                    cachedPrefixLayout = null
+                }
+                val lineText = cachedLineText
+                val visualStartColumn = state.visualLineStartColumn(visualLine)
+                val visualEndColumn = state.visualLineEndColumn(visualLine)
+                    .coerceIn(visualStartColumn, lineText.length)
+                val lineStartCol = (if (line == endpoints.startLine) endpoints.startColumn else 0)
+                    .coerceIn(0, lineText.length)
+                val lineEndCol = (if (line == endpoints.endLine) endpoints.endColumn else lineText.length)
+                    .coerceIn(lineStartCol, lineText.length)
+                val startColumn = maxOf(lineStartCol, visualStartColumn)
+                val endColumn = minOf(lineEndCol, visualEndColumn)
+                if (endColumn <= startColumn) continue
 
-            val prefixLayout = cachedPrefixLayout ?: lineLayoutCache.getPrefixLayout(
-                state = state,
-                line = line,
-                lineText = lineText,
-                textVersion = textVersion,
-                paint = textPaint,
-            ).also { cachedPrefixLayout = it }
-            val safeVisualStartColumn = visualStartColumn.coerceIn(0, prefixLayout.length)
-            val safeStartColumn = startColumn.coerceIn(safeVisualStartColumn, prefixLayout.length)
-            val safeEndColumn = endColumn.coerceIn(safeStartColumn, prefixLayout.length)
-            val segmentStartAdvance = prefixLayout.segmentStartAdvance(safeVisualStartColumn)
-            val selectionStartAdvance = prefixLayout.textStartAdvance(safeStartColumn)
-            val selectionEndAdvance = prefixLayout.textEndAdvance(safeEndColumn)
-            val x = textStartX + selectionStartAdvance - segmentStartAdvance
-            val width = (selectionEndAdvance - selectionStartAdvance).coerceAtLeast(0f)
-            val y = state.visualLineTopInViewport(visualLine)
-            drawScope.drawRect(
-                color = selectionBackground,
-                topLeft = Offset(x, y),
-                size = Size(width, lineHeightPx)
-            )
+                val prefixLayout = cachedPrefixLayout ?: lineLayoutCache.getPrefixLayout(
+                    state = state,
+                    line = line,
+                    lineText = lineText,
+                    textVersion = textVersion,
+                    paint = textPaint,
+                ).also { cachedPrefixLayout = it }
+                val safeVisualStartColumn = visualStartColumn.coerceIn(0, prefixLayout.length)
+                val safeStartColumn = startColumn.coerceIn(safeVisualStartColumn, prefixLayout.length)
+                val safeEndColumn = endColumn.coerceIn(safeStartColumn, prefixLayout.length)
+                val segmentStartAdvance = prefixLayout.segmentStartAdvance(safeVisualStartColumn)
+                val selectionStartAdvance = prefixLayout.textStartAdvance(safeStartColumn)
+                val selectionEndAdvance = prefixLayout.textEndAdvance(safeEndColumn)
+                val x = textStartX + selectionStartAdvance - segmentStartAdvance
+                val width = (selectionEndAdvance - selectionStartAdvance).coerceAtLeast(0f)
+                val y = state.visualLineTopInViewport(visualLine)
+                drawScope.drawRect(
+                    color = selectionBackground,
+                    topLeft = Offset(x, y),
+                    size = Size(width, lineHeightPx)
+                )
+            }
         }
     }
 
@@ -118,6 +120,7 @@ internal class SelectionRenderer {
         lineLayoutCache: EditorLineLayoutCache
     ) {
         val state = frameContext.state
+        if (state.hasMultipleSelections) return
         val layout = resolveSelectionHandleLayout(
             state = state,
             textStartX = textStartX,

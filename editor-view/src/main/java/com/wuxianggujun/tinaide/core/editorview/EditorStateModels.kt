@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 internal class EditorDocumentState(initialVersion: Long) {
     var cursorOffset by mutableStateOf(0)
     var selectionRange by mutableStateOf<OffsetRange?>(null)
+    var secondarySelections by mutableStateOf<List<OffsetRange>>(emptyList())
     var textVersion by mutableStateOf(initialVersion)
 }
 

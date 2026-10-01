@@ -30,7 +30,8 @@ internal fun resolveCursorHandleLayout(
     lineLayoutCache: EditorLineLayoutCache,
     lineTextProvider: (Int) -> String,
     foldEndLineInfo: FoldEndLineCursorInfo? = null,
-    textScanCache: EditorTextScanCache
+    textScanCache: EditorTextScanCache,
+    cursorOffset: Int = state.cursorOffset
 ): CursorHandleLayout? {
     val anchor = resolveCursorVisualAnchor(
         state = state,
@@ -39,7 +40,8 @@ internal fun resolveCursorHandleLayout(
         lineLayoutCache = lineLayoutCache,
         lineTextProvider = lineTextProvider,
         foldEndLineInfo = foldEndLineInfo,
-        textScanCache = textScanCache
+        textScanCache = textScanCache,
+        cursorOffset = cursorOffset
     ) ?: return null
     if (anchor.visualLine !in state.visibleLines) return null
 
