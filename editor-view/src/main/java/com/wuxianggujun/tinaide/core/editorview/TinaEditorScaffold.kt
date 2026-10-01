@@ -24,7 +24,8 @@ import androidx.compose.ui.unit.sp
 internal fun TinaEditorScaffold(
     session: TinaEditorSession,
     modifier: Modifier = Modifier,
-    hoverContent: EditorHoverContent = ::PlainHoverContent
+    hoverContent: EditorHoverContent = ::PlainHoverContent,
+    onToggleLineComment: (() -> Boolean)? = null
 ) {
     val state = session.state
     val ui = session.ui
@@ -54,7 +55,8 @@ internal fun TinaEditorScaffold(
                 onIncreaseFont = { session.fontScaleCoordinator.apply(state.fontSizeSp + 1f) },
                 onDecreaseFont = { session.fontScaleCoordinator.apply(state.fontSizeSp - 1f) },
                 onRequestContextMenu = { session.showContextMenuAtCursor() },
-                onBeforeTextEdit = { interactionController.prepareForExternalEdit() }
+                onBeforeTextEdit = { interactionController.prepareForExternalEdit() },
+                onToggleLineComment = onToggleLineComment
             )
         }
     }

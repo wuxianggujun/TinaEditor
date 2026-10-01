@@ -30,7 +30,8 @@ fun TinaEditor(
     modifier: Modifier = Modifier,
     onPerformanceSnapshotReaderChanged: (((() -> EditorRenderPerformanceSnapshot)?) -> Unit)? = null,
     onExternalEditPreparerChanged: (((() -> Unit)?) -> Unit)? = null,
-    hoverContent: EditorHoverContent = ::PlainHoverContent
+    hoverContent: EditorHoverContent = ::PlainHoverContent,
+    onToggleLineComment: (() -> Boolean)? = null
 ) {
     val session = rememberTinaEditorSession(state)
     DisposableEffect(session, onPerformanceSnapshotReaderChanged) {
@@ -52,6 +53,7 @@ fun TinaEditor(
     TinaEditorScaffold(
         session = session,
         modifier = modifier,
-        hoverContent = hoverContent
+        hoverContent = hoverContent,
+        onToggleLineComment = onToggleLineComment
     )
 }

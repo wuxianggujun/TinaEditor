@@ -29,7 +29,8 @@ internal fun handleEditorShortcut(
     onIncreaseFont: () -> Unit,
     onDecreaseFont: () -> Unit,
     onRequestContextMenu: () -> Unit = {},
-    onBeforeTextEdit: () -> Unit = {}
+    onBeforeTextEdit: () -> Unit = {},
+    onToggleLineComment: (() -> Boolean)? = null
 ): Boolean {
     if (event.type != KeyEventType.KeyDown) return false
     val ctrlShortcutPressed = event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed
@@ -227,6 +228,14 @@ internal fun handleEditorShortcut(
         }
     }
     return when {
+        ctrlShortcutPressed && event.nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_SLASH -> {
+            val toggleLineComment = onToggleLineComment ?: return false
+            onBeforeTextEdit()
+            val changed = toggleLineComment()
+            if (changed) onAfterTextEdit()
+            true
+        }
+
         ctrlAltShortcutPressed && event.key == Key.DirectionUp -> {
             val changed = state.addCursorVertically(direction = -1)
             if (changed) onAfterTextEdit()

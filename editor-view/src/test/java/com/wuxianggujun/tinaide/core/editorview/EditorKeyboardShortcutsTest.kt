@@ -209,6 +209,74 @@ class EditorKeyboardShortcutsTest {
     }
 
     @Test
+    fun handleEditorShortcut_shouldDelegateCtrlSlashAndNotifyAroundChangedEdit() {
+        val state = createState("value")
+        var beforeText: String? = null
+        var afterCount = 0
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_SLASH,
+                metaState = AndroidKeyEvent.META_CTRL_ON
+            ),
+            onBeforeTextEdit = { beforeText = state.textBuffer.toString() },
+            onAfterTextEdit = { afterCount++ },
+            onToggleLineComment = { state.toggleLineComment("//") }
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(beforeText).isEqualTo("value")
+        assertThat(afterCount).isEqualTo(1)
+        assertThat(state.textBuffer.toString()).isEqualTo("// value")
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldConsumeCtrlSlashWithoutAfterNotificationWhenEditDoesNotChange() {
+        val state = createState("// value")
+        var beforeCount = 0
+        var afterCount = 0
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_SLASH,
+                metaState = AndroidKeyEvent.META_CTRL_ON
+            ),
+            onBeforeTextEdit = { beforeCount++ },
+            onAfterTextEdit = { afterCount++ },
+            onToggleLineComment = { false }
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(beforeCount).isEqualTo(1)
+        assertThat(afterCount).isEqualTo(0)
+        assertThat(state.textBuffer.toString()).isEqualTo("// value")
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldLeaveCtrlSlashUnhandledWithoutCommentCallback() {
+        val state = createState("value")
+        var beforeCount = 0
+        var afterCount = 0
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_SLASH,
+                metaState = AndroidKeyEvent.META_CTRL_ON
+            ),
+            onBeforeTextEdit = { beforeCount++ },
+            onAfterTextEdit = { afterCount++ }
+        )
+
+        assertThat(consumed).isFalse()
+        assertThat(beforeCount).isEqualTo(0)
+        assertThat(afterCount).isEqualTo(0)
+        assertThat(state.textBuffer.toString()).isEqualTo("value")
+    }
+
+    @Test
     fun handleEditorShortcut_shouldDismissSignatureHelpOnEscape() {
         val state = EditorState(RopeTextBuffer())
         state.seedVisibleSignatureHelp()
@@ -1180,7 +1248,8 @@ class EditorKeyboardShortcutsTest {
         event: ComposeKeyEvent,
         onAfterTextEdit: () -> Unit = {},
         onApplySelectedCompletion: () -> Boolean = { false },
-        onBeforeTextEdit: () -> Unit = {}
+        onBeforeTextEdit: () -> Unit = {},
+        onToggleLineComment: (() -> Boolean)? = null
     ): Boolean = handleEditorShortcut(
         event = event,
         state = state,
@@ -1197,7 +1266,8 @@ class EditorKeyboardShortcutsTest {
         onDismissSignatureHelp = {},
         onIncreaseFont = {},
         onDecreaseFont = {},
-        onBeforeTextEdit = onBeforeTextEdit
+        onBeforeTextEdit = onBeforeTextEdit,
+        onToggleLineComment = onToggleLineComment
     )
 
     private fun keyDownEvent(

@@ -74,8 +74,16 @@ Gradle 会用 included build 中的同名模块替换该坐标。消费项目仍
 ```kotlin
 val buffer = remember { RopeTextBuffer("Hello, editor!\n") }
 val editorState = remember(buffer) { EditorState(textBuffer = buffer) }
-TinaEditor(state = editorState, modifier = Modifier.fillMaxSize())
+TinaEditor(
+    state = editorState,
+    modifier = Modifier.fillMaxSize(),
+    onToggleLineComment = { editorState.toggleLineComment("//") }
+)
 ```
+
+`onToggleLineComment` 为可选能力。提供后，编辑器会把 `Ctrl+/` 转发给宿主；回调返回
+`true` 表示文本确实发生变化，编辑器据此同步 IME 和外部编辑状态。注释符号由宿主根据当前
+文件语言决定，编辑器内核不依赖宿主的语言配置；不提供回调时不会拦截该快捷键。
 
 应用需自行提供 Activity、Compose 主题、文件读写和语法/LSP 服务。库的包名暂保留
 `com.wuxianggujun.tinaide.core.*`，避免本轮搬迁同时改动 JNI 符号与现有 API；
