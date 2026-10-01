@@ -135,6 +135,100 @@ class EditorInputConnectionEditTest {
     }
 
     @Test
+    fun commitText_withMultipleCursors_shouldEditEveryCursorAndRestoreSelections() {
+        val state = createState("one two")
+        val connection = createConnection(state)
+        state.moveCursorTo(0)
+        assertThat(state.addCursorAt(4)).isTrue()
+
+        connection.commitText("X", 1)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("Xone Xtwo")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(1, 1),
+            OffsetRange(6, 6)
+        ).inOrder()
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("one two")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(4, 4)
+        ).inOrder()
+        assertThat(state.redo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("Xone Xtwo")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(1, 1),
+            OffsetRange(6, 6)
+        ).inOrder()
+    }
+
+    @Test
+    fun composingText_withMultipleCursors_shouldUsePrimaryAndUndoRestoresAllCursors() {
+        val state = createState("one two")
+        val connection = createConnection(state)
+        state.moveCursorTo(0)
+        assertThat(state.addCursorAt(4)).isTrue()
+
+        connection.setComposingText("X", 1)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("Xone two")
+        assertThat(state.hasMultipleSelections).isFalse()
+        assertThat(state.selectionSet.primary).isEqualTo(OffsetRange(1, 1))
+
+        connection.finishComposingText()
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("one two")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(4, 4)
+        ).inOrder()
+        assertThat(state.redo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("Xone two")
+        assertThat(state.hasMultipleSelections).isFalse()
+        assertThat(state.cursorOffset).isEqualTo(1)
+    }
+
+    @Test
+    fun composingRegion_withMultipleCursors_shouldCollapseOnlyForValidRegion() {
+        val state = createState("one two")
+        val connection = createConnection(state)
+        state.moveCursorTo(0)
+        assertThat(state.addCursorAt(4)).isTrue()
+
+        connection.setComposingRegion(0, 1)
+        connection.setComposingText("X", 1)
+        connection.finishComposingText()
+
+        assertThat(state.textBuffer.toString()).isEqualTo("Xne two")
+        assertThat(state.hasMultipleSelections).isFalse()
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("one two")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(4, 4)
+        ).inOrder()
+    }
+
+    @Test
+    fun zeroLengthComposingRegion_withMultipleCursors_shouldKeepPendingMultiCursorState() {
+        val state = createState("one two")
+        val connection = createConnection(state)
+        state.moveCursorTo(0)
+        assertThat(state.addCursorAt(4)).isTrue()
+
+        connection.setComposingRegion(0, 0)
+
+        assertThat(state.hasMultipleSelections).isTrue()
+        connection.setComposingText("X", 1)
+        connection.finishComposingText()
+        assertThat(state.undo()).isTrue()
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(4, 4)
+        ).inOrder()
+    }
+
+    @Test
     fun surroundingText_shouldExcludeSelectedTextFromBeforeAndAfterCursor() {
         val state = createState("abcdef")
         val connection = createConnection(state)
@@ -488,6 +582,33 @@ class EditorInputConnectionEditTest {
         assertThat(state.textBuffer.toString()).isEqualTo("aXYZc")
         assertThat(state.selectionRange).isNull()
         assertThat(state.cursorOffset).isEqualTo(4)
+    }
+
+    @Test
+    fun pasteContextMenuAction_withMultipleCursors_shouldPasteAtEveryCursorAndUndoRedo() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val clipboardManager = context.getSystemService(ClipboardManager::class.java)
+        clipboardManager.setPrimaryClip(ClipData.newPlainText("test", "X"))
+        val state = createState("one two")
+        val connection = createConnection(state, context)
+        state.moveCursorTo(0)
+        assertThat(state.addCursorAt(4)).isTrue()
+
+        assertThat(connection.performContextMenuAction(android.R.id.paste)).isTrue()
+
+        assertThat(state.textBuffer.toString()).isEqualTo("Xone Xtwo")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(1, 1),
+            OffsetRange(6, 6)
+        ).inOrder()
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("one two")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(4, 4)
+        ).inOrder()
+        assertThat(state.redo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("Xone Xtwo")
     }
 
     private fun createState(text: String): EditorState {

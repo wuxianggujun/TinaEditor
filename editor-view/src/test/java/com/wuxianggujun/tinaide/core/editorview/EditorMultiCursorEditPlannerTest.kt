@@ -115,4 +115,71 @@ class EditorMultiCursorEditPlannerTest {
 
         assertThat(buffer.toString()).isEqualTo("Xone Xtwo")
     }
+
+    @Test
+    fun replace_shouldHandleBoundaryAndVariableLengthCases() {
+        data class Case(
+            val document: String,
+            val primary: Int,
+            val secondary: List<Int>,
+            val replacement: String,
+            val expectedEdits: List<EditorTextEdit>,
+            val expectedSelections: List<OffsetRange>
+        )
+
+        val cases = listOf(
+            Case(
+                document = "",
+                primary = 0,
+                secondary = emptyList(),
+                replacement = "X",
+                expectedEdits = listOf(EditorTextEdit(0, 0, "X")),
+                expectedSelections = listOf(OffsetRange(1, 1))
+            ),
+            Case(
+                document = "abc",
+                primary = 0,
+                secondary = listOf(3),
+                replacement = "long",
+                expectedEdits = listOf(
+                    EditorTextEdit(0, 0, "long"),
+                    EditorTextEdit(3, 3, "long")
+                ),
+                expectedSelections = listOf(
+                    OffsetRange(4, 4),
+                    OffsetRange(11, 11)
+                )
+            ),
+            Case(
+                document = "a\r\nb",
+                primary = 1,
+                secondary = listOf(4),
+                replacement = "Z",
+                expectedEdits = listOf(
+                    EditorTextEdit(1, 1, "Z"),
+                    EditorTextEdit(4, 4, "Z")
+                ),
+                expectedSelections = listOf(
+                    OffsetRange(2, 2),
+                    OffsetRange(6, 6)
+                )
+            )
+        )
+
+        cases.forEach { case ->
+            val plan = EditorMultiCursorEditPlanner.replace(
+                selectionSet = EditorSelectionSet.of(
+                    primary = OffsetRange(case.primary, case.primary),
+                    secondary = case.secondary.map { OffsetRange(it, it) }
+                ),
+                replacement = case.replacement,
+                documentLength = case.document.length
+            )
+
+            assertThat(plan.edits).containsExactlyElementsIn(case.expectedEdits).inOrder()
+            assertThat(plan.resultingSelections.selections)
+                .containsExactlyElementsIn(case.expectedSelections)
+                .inOrder()
+        }
+    }
 }

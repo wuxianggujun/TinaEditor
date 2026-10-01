@@ -27,6 +27,7 @@ import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import com.wuxianggujun.tinaide.core.textengine.CompoundEditToken
 import com.wuxianggujun.tinaide.core.textengine.TextChangeListener
+import com.wuxianggujun.tinaide.core.textengine.TextSelectionRangeSnapshot
 import com.wuxianggujun.tinaide.core.textengine.TextSelectionSnapshot
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
@@ -84,6 +85,7 @@ internal class EditorInputConnection(
 
     private var composingRange: ComposingRange? = null
     private var compositionHistoryToken: CompoundEditToken? = null
+    private var compositionSelectionBefore: TextSelectionSnapshot? = null
     private val clipboardManager: ClipboardManager? by lazy(LazyThreadSafetyMode.NONE) {
         targetView.context.getSystemService(ClipboardManager::class.java)
     }
@@ -291,6 +293,7 @@ internal class EditorInputConnection(
 
     override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
         val replacement = text?.toString() ?: ""
+        prepareComposingSession()
         replaceCurrentImeEditRange(
             replacement = replacement,
             newCursorPosition = newCursorPosition,
@@ -306,11 +309,13 @@ internal class EditorInputConnection(
             start = start,
             end = end
         )
-        composingRange = normalizeComposingRange(
+        val nextComposingRange = normalizeComposingRange(
             start = mapped.first,
             end = mapped.second,
             documentLength = state.textBuffer.length
         )
+        if (nextComposingRange != null) prepareComposingSession()
+        composingRange = nextComposingRange
         if (composingRange != null) {
             ensureCompositionHistoryStarted()
         } else {
@@ -1034,10 +1039,19 @@ internal class EditorInputConnection(
     private fun ensureCompositionHistoryStarted() {
         val currentToken = compositionHistoryToken
         if (currentToken != null && state.textBuffer.isCompoundEditActive(currentToken)) return
-        compositionHistoryToken = state.textBuffer.beginCompoundEdit(
+        val token = state.textBuffer.beginCompoundEdit(
             cursorBefore = cursorOffset(),
-            selectionBefore = currentSelectionSnapshot()
+            selectionBefore = compositionSelectionBefore ?: currentSelectionSnapshot()
         )
+        compositionHistoryToken = token
+        compositionSelectionBefore = null
+    }
+
+    private fun prepareComposingSession() {
+        ensureComposingSessionValid()
+        if (compositionHistoryToken != null || !state.hasMultipleSelections) return
+        compositionSelectionBefore = currentSelectionSnapshot()
+        state.clearSecondaryCursors()
     }
 
     private fun ensureComposingSessionValid() {
@@ -1067,8 +1081,12 @@ internal class EditorInputConnection(
 
     private fun finishComposingSession() {
         composingRange = null
-        val token = compositionHistoryToken ?: return
+        val token = compositionHistoryToken ?: run {
+            compositionSelectionBefore = null
+            return
+        }
         compositionHistoryToken = null
+        compositionSelectionBefore = null
         state.textBuffer.endCompoundEdit(
             token = token,
             cursorAfter = cursorOffset(),
@@ -1077,9 +1095,32 @@ internal class EditorInputConnection(
     }
 
     private fun currentSelectionSnapshot(): TextSelectionSnapshot? {
-        if (state.selectionRange == null) return null
-        val (anchor, caret) = imeSelectionOffsets()
+        val selectionSet = state.selectionSet
+        if (state.selectionRange == null && selectionSet.secondary.isEmpty()) return null
+        val primary = selectionSet.primary.toTextSelectionSnapshot()
+        return TextSelectionSnapshot(
+            anchor = primary.anchor,
+            caret = primary.caret,
+            additionalSelections = selectionSet.secondary.map { it.toTextSelectionRangeSnapshot() }
+        )
+    }
+
+    private fun OffsetRange.toTextSelectionSnapshot(): TextSelectionSnapshot {
+        val (anchor, caret) = snapSelectionToEditorUnitBoundaries(
+            textBuffer = state.textBuffer,
+            start = this.anchor,
+            end = this.caret
+        )
         return TextSelectionSnapshot(anchor = anchor, caret = caret)
+    }
+
+    private fun OffsetRange.toTextSelectionRangeSnapshot(): TextSelectionRangeSnapshot {
+        val (anchor, caret) = snapSelectionToEditorUnitBoundaries(
+            textBuffer = state.textBuffer,
+            start = this.anchor,
+            end = this.caret
+        )
+        return TextSelectionRangeSnapshot(anchor = anchor, caret = caret)
     }
 
     private fun updateTextChangeListenerRegistration() {
