@@ -8,9 +8,11 @@
 
 | 模块 | 职责 |
 | --- | --- |
-| `:core:editor-api` | 文件类型、主题键、语义 token 与 Signature Help 公共模型 |
+| `:core:editor-api` | 主题键、语义 token 与 Signature Help 公共模型，并向后兼容导出文件类型能力 |
+| `:core:language-support` | C/C++ 与 Makefile 文件识别规则，供宿主和 Tree-sitter 复用 |
 | `:core:text-engine` | Rope、行索引、编辑历史、JNI 文本扫描 |
-| `:core:tree-sitter` | 语法高亮、语言注册、折叠区域 |
+| `:core:tree-sitter` | 语法高亮、语言注册、折叠区域核心（不内置 grammar 依赖） |
+| `:core:tree-sitter-grammars` | 可选语言 grammar bindings；宿主按需显式装配 |
 | `:core:editor-view` | Compose 编辑器、IME、选择、滚动、弹窗与渲染 |
 
 TinaIDE 的 `:core:editor-lsp`、`:feature:editor`、项目路径、编译运行、插件和偏好存储
@@ -20,7 +22,7 @@ TinaIDE 的 `:core:editor-lsp`、`:feature:editor`、项目路径、编译运行
 
 ## 构建
 
-要求 JDK 17、Android SDK 37、NDK 29.0.14206865 与 CMake 3.22.1；库的
+要求 JDK 17、Android SDK 36、NDK 29.0.14206865 与 CMake 3.22.1；库的
 最低 Android API 为 28。请设置 `ANDROID_HOME` 指向 SDK，以便复合构建中的
 Tree-sitter 子项目也能定位 SDK。源码与构建脚本均为 UTF-8。
 克隆独立仓库时请初始化 Tree-sitter 源码子模块：
@@ -31,7 +33,9 @@ git submodule update --init --recursive
 
 ```bash
 ./gradlew :core:text-engine:testDebugUnitTest --no-daemon --console=plain
+./gradlew :core:language-support:compileDebugKotlin --no-daemon --console=plain
 ./gradlew :core:tree-sitter:compileDebugKotlin --no-daemon --console=plain
+./gradlew :core:tree-sitter-grammars:compileDebugKotlin --no-daemon --console=plain
 ./gradlew :core:editor-view:compileDebugKotlin --no-daemon --console=plain
 ```
 
@@ -50,6 +54,8 @@ includeBuild("TinaEditor")
 
 ```kotlin
 implementation("io.github.tinaide.editor:editor-view:0.1.0-SNAPSHOT")
+// 需要内置语言 grammar 时再显式添加：
+// implementation("io.github.tinaide.editor:tree-sitter-grammars:0.1.0-SNAPSHOT")
 ```
 
 Gradle 会用 included build 中的同名模块替换该坐标。消费项目仍需配置 `google()`

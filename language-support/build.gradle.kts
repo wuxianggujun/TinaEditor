@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.wuxianggujun.tinaide.core.editorapi"
+    namespace = "com.wuxianggujun.tinaide.core.languagesupport"
     compileSdk = 36
     defaultConfig {
         minSdk = 28
@@ -22,5 +22,6 @@ ktlint {
 }
 
 dependencies {
-    api(project(":core:language-support"))
+    testImplementation(libs.junit)
+    testImplementation(libs.tests.google.truth)
 }

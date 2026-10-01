@@ -82,25 +82,12 @@ internal class EditorRenderer(
 
         val frameContext = frameContext(state)
         if (pinLineNumber) {
-            if (lineNumberWidth > 0f) {
-                drawScope.drawRect(
-                    color = scheme.lineNumberBackground,
-                    topLeft = Offset.Zero,
-                    size = Size(lineNumberWidth, drawScope.size.height)
-                )
-            }
-            drawScope.drawRect(
-                color = scheme.gutterBackground,
-                topLeft = Offset(lineNumberWidth, 0f),
-                size = Size(gutterWidth, drawScope.size.height)
-            )
-            lineNumberRenderer.draw(drawScope, state, lineNumberPaint, lineNumberWidth)
-            gutterRenderer.draw(drawScope, state, lineNumberWidth)
-            drawScope.drawLine(
-                color = scheme.gutterDivider,
-                start = Offset(lineNumberWidth + gutterWidth, 0f),
-                end = Offset(lineNumberWidth + gutterWidth, drawScope.size.height),
-                strokeWidth = dividerWidthPx
+            drawScope.drawGutter(
+                scheme = scheme,
+                state = state,
+                lineNumberPaint = lineNumberPaint,
+                lineNumberWidth = lineNumberWidth,
+                gutterWidth = gutterWidth
             )
 
             drawScope.clipRect(
@@ -110,69 +97,11 @@ internal class EditorRenderer(
                 bottom = drawScope.size.height
             ) {
                 translate(left = -state.scrollOffsetXPx) {
-                    selectionRenderer.drawCurrentLineHighlight(this, frameContext, textStartX)
-                    wordOccurrenceRenderer.drawHighlights(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    bracketPairGuideRenderer.drawGuides(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    selectionRenderer.drawSelection(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    textStats = textRenderer.drawText(
+                    textStats = drawTextLayers(
                         drawScope = this,
                         frameContext = frameContext,
                         textPaint = textPaint,
-                        textStartX = textStartX,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    inlayHintRenderer.draw(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    whitespaceRenderer.drawWhitespace(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    matchingBracketRenderer.drawHighlights(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    diagnosticRenderer.drawDiagnostics(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    selectionRenderer.drawSelectionHandles(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
+                        textStartX = textStartX
                     )
                 }
             }
@@ -184,90 +113,18 @@ internal class EditorRenderer(
                 bottom = drawScope.size.height
             ) {
                 translate(left = -state.scrollOffsetXPx) {
-                    if (lineNumberWidth > 0f) {
-                        drawRect(
-                            color = scheme.lineNumberBackground,
-                            topLeft = Offset.Zero,
-                            size = Size(lineNumberWidth, size.height)
-                        )
-                    }
-                    drawRect(
-                        color = scheme.gutterBackground,
-                        topLeft = Offset(lineNumberWidth, 0f),
-                        size = Size(gutterWidth, size.height)
+                    drawGutter(
+                        scheme = scheme,
+                        state = state,
+                        lineNumberPaint = lineNumberPaint,
+                        lineNumberWidth = lineNumberWidth,
+                        gutterWidth = gutterWidth
                     )
-                    lineNumberRenderer.draw(this, state, lineNumberPaint, lineNumberWidth)
-                    gutterRenderer.draw(this, state, lineNumberWidth)
-                    drawLine(
-                        color = scheme.gutterDivider,
-                        start = Offset(lineNumberWidth + gutterWidth, 0f),
-                        end = Offset(lineNumberWidth + gutterWidth, size.height),
-                        strokeWidth = dividerWidthPx
-                    )
-
-                    selectionRenderer.drawCurrentLineHighlight(this, frameContext, textStartX)
-                    wordOccurrenceRenderer.drawHighlights(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    bracketPairGuideRenderer.drawGuides(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    selectionRenderer.drawSelection(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    textStats = textRenderer.drawText(
+                    textStats = drawTextLayers(
                         drawScope = this,
                         frameContext = frameContext,
                         textPaint = textPaint,
-                        textStartX = textStartX,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    inlayHintRenderer.draw(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    whitespaceRenderer.drawWhitespace(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    matchingBracketRenderer.drawHighlights(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    diagnosticRenderer.drawDiagnostics(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
-                    )
-                    selectionRenderer.drawSelectionHandles(
-                        drawScope = this,
-                        frameContext = frameContext,
-                        textStartX = textStartX,
-                        textPaint = textPaint,
-                        lineLayoutCache = lineLayoutCache
+                        textStartX = textStartX
                     )
                 }
             }
@@ -529,6 +386,108 @@ internal class EditorRenderer(
         textScanCache.applyTextChange(change, currentVersion)
         lineLayoutCache.applyTextChange(change, currentVersion)
         bracketSnapshotCache.applyTextChange(change, currentVersion, currentLineCount)
+    }
+
+    private fun DrawScope.drawGutter(
+        scheme: EditorColorScheme,
+        state: EditorState,
+        lineNumberPaint: Paint,
+        lineNumberWidth: Float,
+        gutterWidth: Float
+    ) {
+        if (lineNumberWidth > 0f) {
+            drawRect(
+                color = scheme.lineNumberBackground,
+                topLeft = Offset.Zero,
+                size = Size(lineNumberWidth, size.height)
+            )
+        }
+        drawRect(
+            color = scheme.gutterBackground,
+            topLeft = Offset(lineNumberWidth, 0f),
+            size = Size(gutterWidth, size.height)
+        )
+        lineNumberRenderer.draw(this, state, lineNumberPaint, lineNumberWidth)
+        gutterRenderer.draw(this, state, lineNumberWidth)
+        drawLine(
+            color = scheme.gutterDivider,
+            start = Offset(lineNumberWidth + gutterWidth, 0f),
+            end = Offset(lineNumberWidth + gutterWidth, size.height),
+            strokeWidth = dividerWidthPx
+        )
+    }
+
+    private fun drawTextLayers(
+        drawScope: DrawScope,
+        frameContext: EditorRenderFrameContext,
+        textPaint: Paint,
+        textStartX: Float
+    ): TextRenderer.FrameCacheStats {
+        selectionRenderer.drawCurrentLineHighlight(drawScope, frameContext, textStartX)
+        wordOccurrenceRenderer.drawHighlights(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        bracketPairGuideRenderer.drawGuides(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        selectionRenderer.drawSelection(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        val textStats = textRenderer.drawText(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textPaint = textPaint,
+            textStartX = textStartX,
+            lineLayoutCache = lineLayoutCache
+        )
+        inlayHintRenderer.draw(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        whitespaceRenderer.drawWhitespace(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        matchingBracketRenderer.drawHighlights(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        diagnosticRenderer.drawDiagnostics(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        selectionRenderer.drawSelectionHandles(
+            drawScope = drawScope,
+            frameContext = frameContext,
+            textStartX = textStartX,
+            textPaint = textPaint,
+            lineLayoutCache = lineLayoutCache
+        )
+        return textStats
     }
 
     private fun frameContext(state: EditorState): EditorRenderFrameContext {

@@ -7,6 +7,11 @@ import com.itsaky.androidide.treesitter.TSQueryCursor
 import com.itsaky.androidide.treesitter.TSTree
 import java.io.File
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 /**
@@ -32,74 +37,119 @@ class TreeSitterFoldingProvider private constructor(
         val isFoldable: Boolean get() = endLine > startLine
     }
 
-    fun computeFoldRegions(text: String): List<FoldRegion> {
-        if (text.isEmpty()) return emptyList()
-        return synchronized(lock) {
-            if (disposed || !query.canAccess()) return@synchronized emptyList()
-            runCatching {
-                val tree = ensureParsedTree(text) ?: return@runCatching emptyList()
-                if (cachedRevision == parsedRevision) {
-                    return@runCatching cachedRegions
-                }
+    data class FoldComputationResult(
+        val documentVersion: Long,
+        val requestId: Long,
+        val regions: List<FoldRegion>
+    )
 
-                val rootNode = tree.getRootNode()
-                queryCursor.exec(query, rootNode)
+    fun computeFoldRegions(text: String): List<FoldRegion> = synchronized(lock) {
+        computeFoldRegionsLocked(text)
+    }
 
-                val startToEndLine = HashMap<Int, Int>(64)
-                var match = queryCursor.nextMatch()
-                while (match != null) {
-                    val captures = match.captures
-                    for (capture in captures) {
-                        val node = capture.node
-                        if (!node.canAccess() || node.isNull) continue
-
-                        val foldNode = resolveFoldBoundaryNode(node)
-                        if (!foldNode.canAccess() || foldNode.isNull) continue
-
-                        val startLine = foldNode.startPoint.row
-                        var endLine = foldNode.endPoint.row
-                        if (foldNode.endPoint.column == 0 && endLine > startLine) {
-                            endLine -= 1
-                        }
-                        if (endLine <= startLine) continue
-
-                        val existing = startToEndLine[startLine]
-                        if (existing == null || endLine > existing) {
-                            startToEndLine[startLine] = endLine
-                        }
-                    }
-                    match = queryCursor.nextMatch()
-                }
-
-                val regions = startToEndLine.entries.asSequence()
-                    .map { (start, end) -> FoldRegion(startLine = start, endLine = end) }
-                    .filter { it.isFoldable }
-                    .sortedWith(compareBy<FoldRegion> { it.startLine }.thenByDescending { it.endLine })
-                    .toList()
-
-                if (regions.size <= 50) {
-                    val lines = regions.joinToString { "${it.startLine}→${it.endLine}" }
-                    Timber.tag("TreeSitter").d(
-                        "Fold regions: raw=%d, foldable=%d, lines=[%s]",
-                        startToEndLine.size,
-                        regions.size,
-                        lines
-                    )
-                } else {
-                    Timber.tag("TreeSitter").d(
-                        "Fold regions: raw=%d, foldable=%d (too many to list)",
-                        startToEndLine.size,
-                        regions.size
-                    )
-                }
-
-                cachedRevision = parsedRevision
-                cachedRegions = regions
-                regions
-            }.getOrElse { error ->
-                Timber.tag("TreeSitter").d(error, "Compute folding regions failed")
-                emptyList()
+    /**
+     * Compute folding away from the caller thread and retain the request metadata needed to
+     * reject stale results at the UI boundary.
+     *
+     * Tree-sitter's native parser is not interruptible while a single native call is running,
+     * so cancellation is cooperative between parser/query steps. A cancelled request never
+     * returns a result to the caller.
+     */
+    suspend fun computeFoldRegionsAsync(
+        text: String,
+        documentVersion: Long,
+        requestId: Long
+    ): FoldComputationResult = withContext(Dispatchers.Default) {
+        val coroutineContext = currentCoroutineContext()
+        coroutineContext.ensureActive()
+        val regions = synchronized(lock) {
+            computeFoldRegionsLocked(text) {
+                coroutineContext.ensureActive()
             }
+        }
+        coroutineContext.ensureActive()
+        FoldComputationResult(
+            documentVersion = documentVersion,
+            requestId = requestId,
+            regions = regions
+        )
+    }
+
+    private fun computeFoldRegionsLocked(
+        text: String,
+        ensureActive: () -> Unit = {}
+    ): List<FoldRegion> {
+        if (text.isEmpty()) return emptyList()
+        if (disposed || !query.canAccess()) return emptyList()
+        return try {
+            ensureActive()
+            val tree = ensureParsedTree(text) ?: return emptyList()
+            ensureActive()
+            if (cachedRevision == parsedRevision) {
+                return cachedRegions
+            }
+
+            val rootNode = tree.getRootNode()
+            queryCursor.exec(query, rootNode)
+
+            val startToEndLine = HashMap<Int, Int>(64)
+            var match = queryCursor.nextMatch()
+            while (match != null) {
+                ensureActive()
+                val captures = match.captures
+                for (capture in captures) {
+                    ensureActive()
+                    val node = capture.node
+                    if (!node.canAccess() || node.isNull) continue
+
+                    val foldNode = resolveFoldBoundaryNode(node)
+                    if (!foldNode.canAccess() || foldNode.isNull) continue
+
+                    val startLine = foldNode.startPoint.row
+                    var endLine = foldNode.endPoint.row
+                    if (foldNode.endPoint.column == 0 && endLine > startLine) {
+                        endLine -= 1
+                    }
+                    if (endLine <= startLine) continue
+
+                    val existing = startToEndLine[startLine]
+                    if (existing == null || endLine > existing) {
+                        startToEndLine[startLine] = endLine
+                    }
+                }
+                match = queryCursor.nextMatch()
+            }
+
+            val regions = startToEndLine.entries.asSequence()
+                .map { (start, end) -> FoldRegion(startLine = start, endLine = end) }
+                .filter { it.isFoldable }
+                .sortedWith(compareBy<FoldRegion> { it.startLine }.thenByDescending { it.endLine })
+                .toList()
+
+            if (regions.size <= 50) {
+                val lines = regions.joinToString { "${it.startLine}→${it.endLine}" }
+                Timber.tag("TreeSitter").d(
+                    "Fold regions: raw=%d, foldable=%d, lines=[%s]",
+                    startToEndLine.size,
+                    regions.size,
+                    lines
+                )
+            } else {
+                Timber.tag("TreeSitter").d(
+                    "Fold regions: raw=%d, foldable=%d (too many to list)",
+                    startToEndLine.size,
+                    regions.size
+                )
+            }
+
+            cachedRevision = parsedRevision
+            cachedRegions = regions
+            regions
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Throwable) {
+            Timber.tag("TreeSitter").d(error, "Compute folding regions failed")
+            emptyList()
         }
     }
 

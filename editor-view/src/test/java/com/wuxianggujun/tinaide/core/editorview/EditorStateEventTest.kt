@@ -161,6 +161,32 @@ class EditorStateEventTest {
     }
 
     @Test
+    fun observableState_shouldKeepLatestDocumentSelectionAndViewportState() {
+        val state = EditorState(RopeTextBuffer("line one\nline two\nline three"))
+        state.updateMetrics(
+            lineHeightPx = 20f,
+            charWidthPx = 8f,
+            viewportHeightPx = 40f,
+            viewportWidthPx = 120f,
+            contentStartXPx = 32f
+        )
+        state.selectRange(startOffset = 2, endOffset = 8)
+        state.scrollBy(10f)
+        state.updateFocus(true)
+
+        val snapshot = state.observableState.value
+        assertThat(snapshot.documentVersion).isEqualTo(state.textBuffer.version)
+        assertThat(snapshot.documentLength).isEqualTo(state.textBuffer.length)
+        assertThat(snapshot.cursorOffset).isEqualTo(state.cursorOffset)
+        assertThat(snapshot.selectionRange).isEqualTo(OffsetRange(2, 8))
+        assertThat(snapshot.scrollOffsetPx).isEqualTo(state.scrollOffsetPx)
+        assertThat(snapshot.isFocused).isTrue()
+        assertThat(snapshot.viewportWidthPx).isEqualTo(120f)
+        assertThat(snapshot.viewportHeightPx).isEqualTo(40f)
+        assertThat(snapshot.contentStartXPx).isEqualTo(32f)
+    }
+
+    @Test
     fun gotoLine_shouldClampOutOfRangeLineAndColumn() {
         val buffer = RopeTextBuffer("a\nbc")
         val state = EditorState(buffer)

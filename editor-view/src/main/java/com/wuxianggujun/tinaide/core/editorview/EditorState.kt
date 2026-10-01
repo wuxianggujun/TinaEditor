@@ -20,7 +20,10 @@ import java.util.LinkedHashMap
 import kotlin.math.floor
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
 
 @Stable
@@ -53,13 +56,28 @@ class EditorState(
         }
     var typeface by mutableStateOf<Typeface>(Typeface.MONOSPACE)
     var colorScheme by mutableStateOf(EditorColorScheme.builtinGray())
+    private val documentState = EditorDocumentState(textBuffer.version)
+    private val viewportState = EditorViewportState()
 
     fun retargetFile(newFile: File?) {
         file = newFile
     }
 
-    override var cursorOffset by mutableStateOf(0)
-    override var selectionRange by mutableStateOf<OffsetRange?>(null)
+    override var cursorOffset: Int
+        get() = documentState.cursorOffset
+        set(value) {
+            if (documentState.cursorOffset == value) return
+            documentState.cursorOffset = value
+            markObservableStateChanged()
+        }
+
+    override var selectionRange: OffsetRange?
+        get() = documentState.selectionRange
+        set(value) {
+            if (documentState.selectionRange == value) return
+            documentState.selectionRange = value
+            markObservableStateChanged()
+        }
 
     private var cachedCursorOffset = -1
     private var cachedCursorVersion = -1L
@@ -89,17 +107,96 @@ class EditorState(
     var fontSizeSp by mutableStateOf(config.fontSizeSp)
     var pinLineNumber by mutableStateOf(config.pinLineNumber)
 
-    var scrollOffsetPx by mutableStateOf(0f)
-    var scrollOffsetXPx by mutableStateOf(0f)
-    var viewportHeightPx by mutableStateOf(1f)
-    var viewportWidthPx by mutableStateOf(1f)
+    var scrollOffsetPx: Float
+        get() = viewportState.scrollOffsetPx
+        set(value) {
+            if (viewportState.scrollOffsetPx == value) return
+            viewportState.scrollOffsetPx = value
+            markObservableStateChanged()
+        }
+
+    var scrollOffsetXPx: Float
+        get() = viewportState.scrollOffsetXPx
+        set(value) {
+            if (viewportState.scrollOffsetXPx == value) return
+            viewportState.scrollOffsetXPx = value
+            markObservableStateChanged()
+        }
+
+    var viewportHeightPx: Float
+        get() = viewportState.viewportHeightPx
+        set(value) {
+            if (viewportState.viewportHeightPx == value) return
+            viewportState.viewportHeightPx = value
+            markObservableStateChanged()
+        }
+
+    var viewportWidthPx: Float
+        get() = viewportState.viewportWidthPx
+        set(value) {
+            if (viewportState.viewportWidthPx == value) return
+            viewportState.viewportWidthPx = value
+            markObservableStateChanged()
+        }
 
     // 文本区起始位置（canvas 坐标）。用于处理“行号栏是否跟随横向滚动”的坐标收敛。
-    var contentStartXPx by mutableStateOf(0f)
-    var lineHeightPx by mutableStateOf(1f)
-    var charWidthPx by mutableStateOf(1f)
-    var isFocused by mutableStateOf(false)
+    var contentStartXPx: Float
+        get() = viewportState.contentStartXPx
+        set(value) {
+            if (viewportState.contentStartXPx == value) return
+            viewportState.contentStartXPx = value
+            markObservableStateChanged()
+        }
+
+    var lineHeightPx: Float
+        get() = viewportState.lineHeightPx
+        set(value) {
+            if (viewportState.lineHeightPx == value) return
+            viewportState.lineHeightPx = value
+            markObservableStateChanged()
+        }
+
+    var charWidthPx: Float
+        get() = viewportState.charWidthPx
+        set(value) {
+            if (viewportState.charWidthPx == value) return
+            viewportState.charWidthPx = value
+            markObservableStateChanged()
+        }
+
+    var isFocused: Boolean
+        get() = viewportState.isFocused
+        set(value) {
+            if (viewportState.isFocused == value) return
+            viewportState.isFocused = value
+            markObservableStateChanged()
+        }
     var cursorBlinkVisible by mutableStateOf(true)
+
+    private var observableStateReady = false
+    private var observableStateBatchDepth = 0
+    private var observableStateDirty = false
+    private val _observableState = MutableStateFlow(
+        EditorObservableState(
+            documentVersion = textBuffer.version,
+            documentLength = textBuffer.length,
+            cursorOffset = 0,
+            selectionRange = null,
+            scrollOffsetXPx = 0f,
+            scrollOffsetPx = 0f,
+            isFocused = false,
+            viewportWidthPx = 1f,
+            viewportHeightPx = 1f,
+            contentStartXPx = 0f,
+            lineHeightPx = 1f,
+            charWidthPx = 1f,
+        )
+    )
+    val observableState: StateFlow<EditorObservableState> = _observableState.asStateFlow()
+
+    init {
+        observableStateReady = true
+    }
 
     /**
      * 双指缩放锚点：用于在字体缩放导致 wordWrap 重排时，保持“手指附近的文本”尽可能稳定。
@@ -163,8 +260,13 @@ class EditorState(
     internal var columnXInTextPxResolver: ((line: Int, column: Int) -> Float)? = null
 
     // 用于触发 Compose 重组的状态，每次文本变化时更新
-    internal var textVersion by mutableStateOf(textBuffer.version)
-        private set
+    internal var textVersion: Long
+        get() = documentState.textVersion
+        private set(value) {
+            if (documentState.textVersion == value) return
+            documentState.textVersion = value
+            markObservableStateChanged()
+        }
 
     internal var highlightVersion by mutableStateOf(0L)
         private set
@@ -764,16 +866,18 @@ class EditorState(
     ) {
         val oldX = scrollOffsetXPx
         val oldY = scrollOffsetPx
-        this.lineHeightPx = lineHeightPx.coerceAtLeast(1f)
-        this.charWidthPx = charWidthPx.coerceAtLeast(1f)
-        this.viewportHeightPx = viewportHeightPx.coerceAtLeast(1f)
-        this.viewportWidthPx = viewportWidthPx.coerceAtLeast(1f)
-        this.contentStartXPx = contentStartXPx.coerceAtLeast(0f)
-        pendingScaleAnchor?.let { anchor ->
-            pendingScaleAnchor = null
-            applyScaleAnchor(anchor)
+        withObservableStateBatch {
+            this@EditorState.lineHeightPx = lineHeightPx.coerceAtLeast(1f)
+            this@EditorState.charWidthPx = charWidthPx.coerceAtLeast(1f)
+            this@EditorState.viewportHeightPx = viewportHeightPx.coerceAtLeast(1f)
+            this@EditorState.viewportWidthPx = viewportWidthPx.coerceAtLeast(1f)
+            this@EditorState.contentStartXPx = contentStartXPx.coerceAtLeast(0f)
+            pendingScaleAnchor?.let { anchor ->
+                pendingScaleAnchor = null
+                applyScaleAnchor(anchor)
+            }
+            clampScroll()
         }
-        clampScroll()
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
     }
 
@@ -1632,6 +1736,7 @@ class EditorState(
 
     internal fun emitTextChanged(reason: String) {
         textVersion = textBuffer.version
+        markObservableStateChanged()
         emitEvent(
             EditorEvent.TextChanged(
                 reason = reason,
@@ -1652,6 +1757,7 @@ class EditorState(
         // segment count 与完整 wrap layout 分开维护；这里只基于当前文本重算编辑窗内的行。
         applyTextChangeToDocSegmentCounts(change, currentVersion)
         normalizeInteractionOffsetsAfterTextChange()
+        markObservableStateChanged()
     }
 
     private fun normalizeInteractionOffsetsAfterTextChange() {
@@ -1678,6 +1784,43 @@ class EditorState(
 
     internal fun emitEvent(event: EditorEvent) {
         _events.tryEmit(event)
+    }
+
+    private fun markObservableStateChanged() {
+        if (!observableStateReady) return
+        if (observableStateBatchDepth > 0) {
+            observableStateDirty = true
+            return
+        }
+        _observableState.value = currentObservableState()
+    }
+
+    private fun currentObservableState(): EditorObservableState = EditorObservableState(
+        documentVersion = textBuffer.version,
+        documentLength = textBuffer.length,
+        cursorOffset = cursorOffset,
+        selectionRange = selectionRange,
+        scrollOffsetXPx = scrollOffsetXPx,
+        scrollOffsetPx = scrollOffsetPx,
+        isFocused = isFocused,
+        viewportWidthPx = viewportWidthPx,
+        viewportHeightPx = viewportHeightPx,
+        contentStartXPx = contentStartXPx,
+        lineHeightPx = lineHeightPx,
+        charWidthPx = charWidthPx,
+    )
+
+    private inline fun <T> withObservableStateBatch(block: () -> T): T {
+        observableStateBatchDepth++
+        return try {
+            block()
+        } finally {
+            observableStateBatchDepth--
+            if (observableStateBatchDepth == 0 && observableStateDirty) {
+                observableStateDirty = false
+                _observableState.value = currentObservableState()
+            }
+        }
     }
 
     private fun emitScrollChangedIfNeeded(oldX: Float, oldY: Float) {
