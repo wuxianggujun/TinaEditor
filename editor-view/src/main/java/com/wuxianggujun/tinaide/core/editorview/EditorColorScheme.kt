@@ -594,6 +594,7 @@ data class EditorSyntaxColors(
 
             SemanticTokenType.NUMBER -> HighlightType.NUMBER
             SemanticTokenType.OPERATOR -> HighlightType.OPERATOR
+            SemanticTokenType.CUSTOM -> HighlightType.DEFAULT
         }
         return colorOf(mappedType)
     }

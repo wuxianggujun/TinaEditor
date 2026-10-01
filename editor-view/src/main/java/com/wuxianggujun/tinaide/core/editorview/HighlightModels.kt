@@ -1,13 +1,5 @@
 package com.wuxianggujun.tinaide.core.editorview
 
-data class SemanticToken(
-    val line: Int,
-    val startColumn: Int,
-    val length: Int,
-    val tokenType: SemanticTokenType,
-    val tokenModifiers: Set<SemanticTokenModifier> = emptySet()
-)
-
 data class EditorInlayHint(
     val line: Int,
     val column: Int,
@@ -21,44 +13,6 @@ enum class EditorInlayHintKind {
     PARAMETER,
     TYPE,
     OTHER,
-}
-
-enum class SemanticTokenType {
-    NAMESPACE,
-    TYPE,
-    CLASS,
-    ENUM,
-    INTERFACE,
-    STRUCT,
-    TYPE_PARAMETER,
-    PARAMETER,
-    VARIABLE,
-    PROPERTY,
-    ENUM_MEMBER,
-    EVENT,
-    FUNCTION,
-    METHOD,
-    MACRO,
-    KEYWORD,
-    MODIFIER,
-    COMMENT,
-    STRING,
-    NUMBER,
-    REGEXP,
-    OPERATOR
-}
-
-enum class SemanticTokenModifier {
-    DECLARATION,
-    DEFINITION,
-    READONLY,
-    STATIC,
-    DEPRECATED,
-    ABSTRACT,
-    ASYNC,
-    MODIFICATION,
-    DOCUMENTATION,
-    DEFAULT_LIBRARY
 }
 
 data class EditorCompletionItem(

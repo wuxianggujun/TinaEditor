@@ -35,6 +35,7 @@ internal class IncrementalTreeSitterHighlightState(
         private const val DEFAULT_OPEN_BLOCKING_TIMEOUT_MS = 5000L
         private const val MAX_PENDING_LINE_REQUESTS = 512
         private const val LINE_CAPTURE_BATCH_SIZE = 16
+        private const val MAX_FULL_DOCUMENT_PREWARM_LINES = 20_000
 
         private fun maxCacheSizeFor(lineCount: Int): Int {
             if (lineCount <= 0) return MIN_LINE_CACHE_SIZE
@@ -614,7 +615,13 @@ internal class IncrementalTreeSitterHighlightState(
         try {
             val lineStarts = snapshot.lineStarts
             val maxCacheSize = maxCacheSizeFor(lineCount)
-            val prewarmRanges = TreeSitterPrewarmPlan.ranges(lineCount, viewportHintLine, fullDocument)
+            // 首次打开大文件只预热首屏附近；其余行由可见行请求按需填充，避免打开阶段长时间占用 worker。
+            val shouldPrewarmFullDocument = fullDocument && lineCount <= MAX_FULL_DOCUMENT_PREWARM_LINES
+            val prewarmRanges = TreeSitterPrewarmPlan.ranges(
+                lineCount,
+                viewportHintLine,
+                shouldPrewarmFullDocument
+            )
 
             // 跨 chunk 复用同一个 HashMap：每 chunk 开始前 clear() 清掉 key，
             // 被 publish 出去的 ArrayList 引用还在 cache 里，不会被误释放；

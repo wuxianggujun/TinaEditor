@@ -19,6 +19,7 @@ data class TextChange(
     val endLine: Int,
     val endColumn: Int,
     val fromUndoRedo: Boolean = false,
+    val documentVersion: Long = 0L,
     val oldTextLength: Int = oldText.length,
     val oldLineBreakCount: Int = oldText.count { it == '\n' },
     val newLineBreakCount: Int = newText.count { it == '\n' },
@@ -35,6 +36,7 @@ data class TextChange(
     val hasCompleteNewText: Boolean = true
 ) {
     init {
+        require(documentVersion >= 0L) { "documentVersion must not be negative" }
         require(oldTextLength >= 0) { "oldTextLength must not be negative" }
         require(oldLineBreakCount >= 0) { "oldLineBreakCount must not be negative" }
         require(newLineBreakCount >= 0) { "newLineBreakCount must not be negative" }

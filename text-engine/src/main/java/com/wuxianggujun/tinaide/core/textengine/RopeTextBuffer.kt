@@ -1,9 +1,15 @@
 package com.wuxianggujun.tinaide.core.textengine
 
 import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.nio.charset.Charset
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantReadWriteLock
@@ -11,13 +17,16 @@ import kotlin.concurrent.read
 import kotlin.concurrent.write
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 class RopeTextBuffer(
     initialText: String = "",
-    private val history: EditHistory = DefaultEditHistory()
-) : TextBuffer {
+    private val history: EditHistory = DefaultEditHistory(),
+    private val changeExecutor: Executor = DIRECT_EXECUTOR
+) : TextBuffer, AutoCloseable {
     private companion object {
         private const val FNV1A_64_OFFSET_BASIS = -0x340d631b8c4675d9L
         private const val FNV1A_64_PRIME = 0x100000001b3L
@@ -25,12 +34,14 @@ class RopeTextBuffer(
         private const val SLOW_LOAD_THRESHOLD_MS = 120L
         private const val SLOW_SAVE_THRESHOLD_MS = 120L
         private const val POSITION_CACHE_SIZE = 8
+        private val DIRECT_EXECUTOR = Executor { command -> command.run() }
     }
 
     private val lock = ReentrantReadWriteLock()
     private val rope = Rope()
     private val lineIndex = LineIndex()
     private val listeners = CopyOnWriteArrayList<TextChangeListener>()
+    private var closed = false
     private val versionCounter = AtomicLong(0L)
     private val _versionFlow = kotlinx.coroutines.flow.MutableStateFlow(0L)
     override val versionFlow: kotlinx.coroutines.flow.StateFlow<Long> = _versionFlow
@@ -57,10 +68,10 @@ class RopeTextBuffer(
     }
 
     override val length: Int
-        get() = lock.read { rope.length }
+        get() = lock.read { ensureOpen(); rope.length }
 
     override val lineCount: Int
-        get() = lock.read { lineIndex.lineCount }
+        get() = lock.read { ensureOpen(); lineIndex.lineCount }
 
     override val version: Long
         get() = versionCounter.get()
@@ -122,6 +133,7 @@ class RopeTextBuffer(
         cursorBefore: Int?,
         selectionBefore: TextSelectionSnapshot?
     ): CompoundEditToken = lock.write {
+        ensureOpen()
         history.beginCompoundEdit(cursorBefore, selectionBefore)
     }
 
@@ -131,11 +143,13 @@ class RopeTextBuffer(
         selectionAfter: TextSelectionSnapshot?
     ) {
         lock.write {
+            ensureOpen()
             history.endCompoundEdit(token, cursorAfter, selectionAfter)
         }
     }
 
     override fun isCompoundEditActive(token: CompoundEditToken): Boolean = lock.read {
+        ensureOpen()
         history.isCompoundEditActive(token)
     }
 
@@ -149,6 +163,7 @@ class RopeTextBuffer(
         var shouldDrain = false
         return try {
             lock.write {
+                ensureOpen()
                 val isOutermostTransaction = editTransactionDepth == 0
                 if (isOutermostTransaction) {
                     deferredTransactionChanges = mutableListOf()
@@ -210,6 +225,7 @@ class RopeTextBuffer(
 
     /** 调用方必须持有写锁。返回 true 表示有待派发的变更。 */
     private fun applyReplaceAllLocked(text: String): Boolean {
+        ensureOpen()
         val previousLength = rope.length
         val contentUnchanged = rope.contentEquals(text)
         history.clear()
@@ -232,6 +248,7 @@ class RopeTextBuffer(
             endLine = previousEndPos.line,
             endColumn = previousEndPos.column,
             fromUndoRedo = false,
+            documentVersion = versionCounter.get(),
             oldTextLength = previousLength,
             oldLineBreakCount = previousLineBreakCount,
             oldTextEndsWithLineBreak = previousEndsWithLineBreak,
@@ -240,6 +257,7 @@ class RopeTextBuffer(
     }
 
     override fun substring(start: Int, end: Int): String = lock.read {
+        ensureOpen()
         rope.substring(start, end)
     }
 
@@ -250,6 +268,7 @@ class RopeTextBuffer(
      * 哈希为 FNV-1a 64 位，逐 UTF-16 char 折叠，结果与对完整字符串做同样折叠一致。
      */
     fun contentFingerprint(): TextContentFingerprint = lock.read {
+        ensureOpen()
         var hash = FNV1A_64_OFFSET_BASIS
         rope.forEachChunk { chunk ->
             for (index in chunk.indices) {
@@ -269,6 +288,7 @@ class RopeTextBuffer(
     }
 
     override fun charAt(offset: Int): Char? = lock.read {
+        ensureOpen()
         if (offset < 0 || offset >= rope.length) {
             null
         } else {
@@ -277,30 +297,36 @@ class RopeTextBuffer(
     }
 
     override fun getLine(line: Int): String = lock.read {
+        ensureOpen()
         val start = lineIndex.getLineStart(line)
         val end = logicalLineEnd(line)
         rope.substring(start, end)
     }
 
     override fun getLineStart(line: Int): Int = lock.read {
+        ensureOpen()
         lineIndex.getLineStart(line)
     }
 
     override fun getLineEnd(line: Int): Int = lock.read {
+        ensureOpen()
         logicalLineEnd(line)
     }
 
     override fun offsetToLine(offset: Int): Int = lock.read {
+        ensureOpen()
         lineIndex.offsetToLine(offset.coerceIn(0, rope.length))
     }
 
     override fun positionToOffset(line: Int, column: Int): Int = lock.read {
+        ensureOpen()
         val start = lineIndex.getLineStart(line)
         val end = logicalLineEnd(line)
         start + column.coerceIn(0, end - start)
     }
 
     override fun offsetToPosition(offset: Int): Position = lock.read {
+        ensureOpen()
         val safeOffset = offset.coerceIn(0, rope.length)
         val currentVersion = versionCounter.get()
         synchronized(positionCacheLock) {
@@ -329,19 +355,23 @@ class RopeTextBuffer(
     }
 
     override fun addChangeListener(listener: TextChangeListener) {
-        listeners.addIfAbsent(listener)
+        lock.read {
+            ensureOpen()
+            listeners.addIfAbsent(listener)
+        }
     }
 
     override fun removeChangeListener(listener: TextChangeListener) {
         listeners.remove(listener)
     }
 
-    override fun canUndo(): Boolean = lock.read { history.canUndo() }
+    override fun canUndo(): Boolean = lock.read { ensureOpen(); history.canUndo() }
 
-    override fun canRedo(): Boolean = lock.read { history.canRedo() }
+    override fun canRedo(): Boolean = lock.read { ensureOpen(); history.canRedo() }
 
     override fun undo(): UndoRedoResult? {
         val result = lock.write {
+            ensureOpen()
             if (!history.canUndo()) return@write null
             val operation = history.undo() ?: return@write null
             val changes = applyUndoOperation(operation)
@@ -357,6 +387,7 @@ class RopeTextBuffer(
 
     override fun redo(): UndoRedoResult? {
         val result = lock.write {
+            ensureOpen()
             if (!history.canRedo()) return@write null
             val operation = history.redo() ?: return@write null
             val changes = applyRedoOperation(operation)
@@ -462,10 +493,12 @@ class RopeTextBuffer(
     }
 
     override suspend fun loadFromFile(file: File, charset: Charset): Result<Unit> {
+        var staged: StagedLoad? = null
         return try {
             val startNs = System.nanoTime()
-            val staged = withContext(Dispatchers.IO) { streamFileIntoStagingArea(file, charset) }
-            val result = lock.write { commitStagedLoadLocked(staged) }
+            lock.read { ensureOpen() }
+            staged = withContext(Dispatchers.IO) { streamFileIntoStagingArea(file, charset) }
+            val result = lock.write { commitStagedLoadLocked(checkNotNull(staged)) }
             if (result.shouldDrain) drainDispatchQueue()
             logSlowLoadIfNeeded(
                 file = file,
@@ -475,38 +508,79 @@ class RopeTextBuffer(
             Result.success(Unit)
         } catch (cancellation: CancellationException) {
             throw cancellation
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
             Result.failure(error)
+        } finally {
+            staged?.lineIndex?.close()
         }
     }
 
     override suspend fun saveToFile(file: File, charset: Charset): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val startNs = System.nanoTime()
             file.parentFile?.mkdirs()
-            val writtenChars = lock.read {
-                // 流式写：按 rope 内部 4KB 分片逐块 encode，不再把整份文档先拼成 String。
-                // 对 50MB 文件可省 100MB 堆分配 + 一次 writeText 的再拷贝。
-                var total = 0
-                file.outputStream().use { out ->
-                    out.writer(charset).use { writer ->
-                        rope.forEachChunk { chunk ->
-                            writer.append(chunk)
-                            total += chunk.length
+            val destination = file.absoluteFile.toPath()
+            val temporary = Files.createTempFile(destination.parent, ".${file.name}.", ".tina-tmp")
+            try {
+                val coroutineContext = currentCoroutineContext()
+                val writtenChars = lock.read {
+                    ensureOpen()
+                    var total = 0
+                    FileOutputStream(temporary.toFile()).use { output ->
+                        OutputStreamWriter(output, charset).use { writer ->
+                            rope.forEachChunk { chunk ->
+                                coroutineContext.ensureActive()
+                                writer.append(chunk)
+                                total += chunk.length
+                            }
+                            writer.flush()
+                            output.fd.sync()
                         }
                     }
+                    total
                 }
-                total
+                coroutineContext.ensureActive()
+                try {
+                    Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING)
+                }
+                logSlowSaveIfNeeded(
+                    file = file,
+                    writtenChars = writtenChars,
+                    durationMs = (System.nanoTime() - startNs) / 1_000_000L
+                )
+                Result.success(Unit)
+            } finally {
+                Files.deleteIfExists(temporary)
             }
-            logSlowSaveIfNeeded(
-                file = file,
-                writtenChars = writtenChars,
-                durationMs = (System.nanoTime() - startNs) / 1_000_000L
-            )
+        } catch (cancellation: CancellationException) {
+            throw cancellation
+        } catch (error: Exception) {
+            Result.failure(error)
         }
     }
 
-    override fun toString(): String = lock.read { rope.substring(0, rope.length) }
+    override fun toString(): String = lock.read {
+        ensureOpen()
+        rope.substring(0, rope.length)
+    }
+
+    override fun close() {
+        lock.write {
+            if (closed) return
+            closed = true
+            listeners.clear()
+            synchronized(dispatchQueueLock) { pendingDispatchChanges.clear() }
+            history.clear()
+            rope.setText("")
+            lineIndex.close()
+        }
+    }
+
+    private fun ensureOpen() {
+        check(!closed) { "RopeTextBuffer is already closed" }
+    }
 
     private fun applyInsert(
         offset: Int,
@@ -516,6 +590,7 @@ class RopeTextBuffer(
         historyCursor: TextEditCursorSnapshot? = null,
         enforceCodePointBoundaries: Boolean = true
     ): TextChange? {
+        ensureOpen()
         if (text.isEmpty()) return null
 
         require(offset in 0..rope.length) { "Invalid offset: $offset" }
@@ -538,7 +613,8 @@ class RopeTextBuffer(
             startColumn = startPos.column,
             endLine = startPos.line,
             endColumn = startPos.column,
-            fromUndoRedo = fromUndoRedo
+            fromUndoRedo = fromUndoRedo,
+            documentVersion = versionCounter.get()
         )
     }
 
@@ -550,6 +626,7 @@ class RopeTextBuffer(
         historyCursor: TextEditCursorSnapshot? = null,
         enforceCodePointBoundaries: Boolean = true
     ): TextChange? {
+        ensureOpen()
         if (start == end) return null
         require(start in 0..rope.length && end in start..rope.length) {
             "Invalid range: [$start, $end)"
@@ -581,7 +658,8 @@ class RopeTextBuffer(
             startColumn = startPos.column,
             endLine = endPos.line,
             endColumn = endPos.column,
-            fromUndoRedo = fromUndoRedo
+            fromUndoRedo = fromUndoRedo,
+            documentVersion = versionCounter.get()
         )
     }
 
@@ -594,6 +672,7 @@ class RopeTextBuffer(
         historyCursor: TextEditCursorSnapshot? = null,
         enforceCodePointBoundaries: Boolean = true
     ): TextChange? {
+        ensureOpen()
         require(start in 0..rope.length) { "start out of bounds: $start (length=${rope.length})" }
         require(end in start..rope.length) { "end out of bounds: $end (start=$start, length=${rope.length})" }
         if (start == end && text.isEmpty()) return null
@@ -641,7 +720,8 @@ class RopeTextBuffer(
             startColumn = startPos.column,
             endLine = endPos.line,
             endColumn = endPos.column,
-            fromUndoRedo = fromUndoRedo
+            fromUndoRedo = fromUndoRedo,
+            documentVersion = versionCounter.get()
         )
     }
 
@@ -687,29 +767,37 @@ class RopeTextBuffer(
     }
 
     private fun drainDispatchQueue() {
-        while (true) {
-            if (!dispatchInProgress.compareAndSet(false, true)) return
-            try {
-                while (true) {
-                    val change = synchronized(dispatchQueueLock) {
-                        pendingDispatchChanges.removeFirstOrNull()
-                    } ?: break
-                    dispatchChangeNow(change)
-                }
-            } finally {
-                dispatchInProgress.set(false)
-            }
-
-            val hasPendingChanges = synchronized(dispatchQueueLock) {
-                pendingDispatchChanges.isNotEmpty()
-            }
-            if (!hasPendingChanges) return
+        if (!dispatchInProgress.compareAndSet(false, true)) return
+        try {
+            changeExecutor.execute(::drainDispatchQueueOnExecutor)
+        } catch (error: Throwable) {
+            dispatchInProgress.set(false)
+            Timber.tag("RopeTextBuffer").w(error, "Text change dispatch failed")
         }
     }
 
+    private fun drainDispatchQueueOnExecutor() {
+        try {
+            while (true) {
+                val change = synchronized(dispatchQueueLock) {
+                    pendingDispatchChanges.removeFirstOrNull()
+                } ?: break
+                dispatchChangeNow(change)
+            }
+        } finally {
+            dispatchInProgress.set(false)
+        }
+
+        val hasPendingChanges = synchronized(dispatchQueueLock) {
+            pendingDispatchChanges.isNotEmpty()
+        }
+        if (hasPendingChanges) drainDispatchQueue()
+    }
+
     private fun dispatchChangeNow(change: TextChange) {
+        if (lock.read { closed }) return
         // 主动推进 versionFlow —— 订阅方可以直接 collect 而不用自己维护 callbackFlow + addChangeListener。
-        _versionFlow.value = versionCounter.get()
+        _versionFlow.value = change.documentVersion
         listeners.forEach { listener ->
             runCatching { listener.onTextChanged(change) }
                 .onFailure { Timber.tag("RopeTextBuffer").w(it, "TextChangeListener failed") }
@@ -740,31 +828,35 @@ class RopeTextBuffer(
     private fun streamFileIntoStagingArea(file: File, charset: Charset): StagedLoad {
         val stagingRope = Rope()
         val stagingLineIndex = LineIndex()
-        val builder = stagingRope.beginStreamingBuild()
-
-        var charCount = 0
-        var lineBreakCount = 0
-        InputStreamReader(file.inputStream(), charset).use { reader ->
-            val buffer = CharArray(IO_CHAR_BUFFER_SIZE)
-            while (true) {
-                val count = reader.read(buffer)
-                if (count <= 0) break
-                val chunk = String(buffer, 0, count)
-                builder.append(chunk)
-                stagingLineIndex.appendChunk(chunk)
-                for (index in 0 until count) {
-                    if (buffer[index] == '\n') lineBreakCount++
+        try {
+            val builder = stagingRope.beginStreamingBuild()
+            var charCount = 0
+            var lineBreakCount = 0
+            InputStreamReader(file.inputStream(), charset).use { reader ->
+                val buffer = CharArray(IO_CHAR_BUFFER_SIZE)
+                while (true) {
+                    val count = reader.read(buffer)
+                    if (count <= 0) break
+                    val chunk = String(buffer, 0, count)
+                    builder.append(chunk)
+                    stagingLineIndex.appendChunk(chunk)
+                    for (index in 0 until count) {
+                        if (buffer[index] == '\n') lineBreakCount++
+                    }
+                    charCount += count
                 }
-                charCount += count
             }
+            builder.finish()
+            return StagedLoad(
+                rope = stagingRope,
+                lineIndex = stagingLineIndex,
+                charCount = charCount,
+                lineBreakCount = lineBreakCount
+            )
+        } catch (error: Throwable) {
+            stagingLineIndex.close()
+            throw error
         }
-        builder.finish()
-        return StagedLoad(
-            rope = stagingRope,
-            lineIndex = stagingLineIndex,
-            charCount = charCount,
-            lineBreakCount = lineBreakCount
-        )
     }
 
     /**
@@ -774,6 +866,7 @@ class RopeTextBuffer(
      * 所以 `hasCompleteNewText = false`，消费者需要正文时必须改从 buffer 读。
      */
     private fun commitStagedLoadLocked(staged: StagedLoad): StreamLoadResult {
+        ensureOpen()
         val previousLength = rope.length
         val previousEndPos = offsetToPositionInternal(previousLength)
         val previousLineBreakCount = (lineIndex.lineCount - 1).coerceAtLeast(0)
@@ -795,6 +888,7 @@ class RopeTextBuffer(
             endLine = previousEndPos.line,
             endColumn = previousEndPos.column,
             fromUndoRedo = false,
+            documentVersion = versionCounter.get(),
             oldTextLength = previousLength,
             oldLineBreakCount = previousLineBreakCount,
             newLineBreakCount = staged.lineBreakCount,

@@ -22,6 +22,32 @@ class RopeTextBufferTest {
     }
 
     @Test
+    fun changeListenerShouldReceiveCommittedDocumentVersion() {
+        val buffer = RopeTextBuffer()
+        val versions = mutableListOf<Long>()
+        buffer.addChangeListener { change -> versions += change.documentVersion }
+
+        buffer.insert(0, "a")
+        buffer.insert(1, "b")
+
+        assertThat(versions).containsExactly(1L, 2L).inOrder()
+        assertThat(buffer.versionFlow.value).isEqualTo(2L)
+    }
+
+    @Test
+    fun closeShouldReleaseResourcesAndRejectFurtherAccess() {
+        val buffer = RopeTextBuffer("content")
+
+        buffer.close()
+        buffer.close()
+
+        assertThat(runCatching { buffer.length }.exceptionOrNull())
+            .isInstanceOf(IllegalStateException::class.java)
+        assertThat(runCatching { buffer.insert(0, "x") }.exceptionOrNull())
+            .isInstanceOf(IllegalStateException::class.java)
+    }
+
+    @Test
     fun replace_invalidRangeShouldFailWithoutChangingContent() {
         val buffer = RopeTextBuffer("abc")
 

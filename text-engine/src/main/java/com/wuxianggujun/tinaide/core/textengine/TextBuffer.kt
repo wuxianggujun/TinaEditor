@@ -4,7 +4,7 @@ import java.io.File
 import java.nio.charset.Charset
 import kotlinx.coroutines.flow.StateFlow
 
-interface TextBuffer {
+interface TextBuffer : AutoCloseable {
     val length: Int
     val lineCount: Int
     val version: Long
@@ -16,6 +16,8 @@ interface TextBuffer {
      * 的注册/注销，避免上层 LaunchedEffect 重启时的 listener 注册风暴。
      */
     val versionFlow: StateFlow<Long>
+
+    override fun close() = Unit
 
     fun insert(offset: Int, text: String, historyCursor: TextEditCursorSnapshot? = null)
     fun delete(start: Int, end: Int, historyCursor: TextEditCursorSnapshot? = null)
@@ -61,6 +63,10 @@ interface TextBuffer {
     fun positionToOffset(line: Int, column: Int): Int
     fun offsetToPosition(offset: Int): Position
 
+    /**
+     * 监听器同步运行在派发线程；并发编辑时，该线程不一定是发起编辑的线程。
+     * UI 消费者必须自行切换到主线程，不得在回调中直接修改 Compose 状态。
+     */
     fun addChangeListener(listener: TextChangeListener)
     fun removeChangeListener(listener: TextChangeListener)
 

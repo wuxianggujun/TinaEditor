@@ -11,7 +11,7 @@ internal fun EditorTextBufferRendererSyncEffect(
 ) {
     DisposableEffect(state.textBuffer, renderer) {
         val listener = TextChangeListener { change ->
-            renderer.applyTextChange(change, state.textBuffer.version, state.textBuffer.lineCount)
+            renderer.applyTextChange(change, change.documentVersion, state.textBuffer.lineCount)
         }
         state.textBuffer.addChangeListener(listener)
         onDispose {
