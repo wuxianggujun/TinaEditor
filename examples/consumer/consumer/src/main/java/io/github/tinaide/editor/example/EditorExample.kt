@@ -12,5 +12,9 @@ import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 fun EditorExample() {
     val buffer = remember { RopeTextBuffer("Hello, editor!\n") }
     val editorState = remember(buffer) { EditorState(textBuffer = buffer) }
-    TinaEditor(state = editorState, modifier = Modifier.fillMaxSize())
+    TinaEditor(
+        state = editorState,
+        modifier = Modifier.fillMaxSize(),
+        onToggleLineComment = { editorState.toggleLineComment("//") }
+    )
 }
