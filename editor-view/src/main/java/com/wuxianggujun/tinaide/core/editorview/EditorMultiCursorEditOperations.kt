@@ -31,6 +31,20 @@ internal fun editorDeleteForwardMultipleSelections(state: EditorState): Boolean 
     return applyMultiCursorEditPlan(state, plan, reason = "deleteForward")
 }
 
+internal fun editorDeleteSurroundingMultipleSelections(
+    state: EditorState,
+    reason: String,
+    resolveRange: (Int) -> Pair<Int, Int>?
+): Boolean {
+    if (!state.hasMultipleSelections) return false
+    val plan = EditorMultiCursorEditPlanner.deleteSurrounding(
+        selectionSet = state.selectionSet,
+        documentLength = state.textBuffer.length,
+        resolveRange = resolveRange
+    )
+    return applyMultiCursorEditPlan(state, plan, reason)
+}
+
 private fun applyMultiCursorEditPlan(
     state: EditorState,
     plan: EditorEditPlan,

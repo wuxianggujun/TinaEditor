@@ -84,4 +84,35 @@ class EditorMultiCursorStateTest {
         assertThat(state.hasMultipleSelections).isFalse()
         assertThat(state.selectionSet.primary).isEqualTo(OffsetRange(1, 1))
     }
+
+    @Test
+    fun selectedText_shouldJoinDocumentOrderAndMergeOverlappingSelections() {
+        val state = EditorState(RopeTextBuffer("zero one two"))
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(9, 12),
+                secondary = listOf(
+                    OffsetRange(0, 4),
+                    OffsetRange(2, 6)
+                )
+            ),
+            ensureVisible = false
+        )
+
+        assertThat(state.selectedText()).isEqualTo("zero o\ntwo")
+    }
+
+    @Test
+    fun selectedText_shouldIncludeSecondarySelectionWhenPrimaryIsCollapsed() {
+        val state = EditorState(RopeTextBuffer("abcd"))
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(0, 0),
+                secondary = listOf(OffsetRange(2, 4))
+            ),
+            ensureVisible = false
+        )
+
+        assertThat(state.selectedText()).isEqualTo("cd")
+    }
 }

@@ -104,6 +104,44 @@ class EditorInputConnectionEditTest {
     }
 
     @Test
+    fun deleteSurroundingText_withMultipleCursors_shouldDeleteAroundEveryCursorAndUndoAsOneEntry() {
+        val state = createState("a\r\nb\r\nc")
+        val connection = createConnection(state)
+        state.moveCursorTo(3)
+        assertThat(state.addCursorAt(6)).isTrue()
+
+        connection.deleteSurroundingText(beforeLength = 1, afterLength = 0)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("abc")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(1, 1),
+            OffsetRange(2, 2)
+        ).inOrder()
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\r\nb\r\nc")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(3, 3),
+            OffsetRange(6, 6)
+        ).inOrder()
+    }
+
+    @Test
+    fun deleteSurroundingTextInCodePoints_withMultipleCursors_shouldKeepEmojiAtomic() {
+        val state = createState("A😀B😀C")
+        val connection = createConnection(state)
+        state.moveCursorTo(3)
+        assertThat(state.addCursorAt(6)).isTrue()
+
+        connection.deleteSurroundingTextInCodePoints(beforeLength = 1, afterLength = 0)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("ABC")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(1, 1),
+            OffsetRange(2, 2)
+        ).inOrder()
+    }
+
+    @Test
     fun commitText_shouldReplaceSelection() {
         val state = createState("abc")
         val connection = createConnection(state)
@@ -609,6 +647,51 @@ class EditorInputConnectionEditTest {
         ).inOrder()
         assertThat(state.redo()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo("Xone Xtwo")
+    }
+
+    @Test
+    fun copyContextMenuAction_withMultipleSelections_shouldJoinSelectionsInDocumentOrder() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val clipboardManager = context.getSystemService(ClipboardManager::class.java)
+        val state = createState("one two")
+        val connection = createConnection(state, context)
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(4, 7),
+                secondary = listOf(OffsetRange(0, 3))
+            ),
+            ensureVisible = false
+        )
+
+        assertThat(connection.performContextMenuAction(android.R.id.copy)).isTrue()
+        assertThat(clipboardManager.primaryClip?.getItemAt(0)?.text?.toString())
+            .isEqualTo("one\ntwo")
+        assertThat(state.textBuffer.toString()).isEqualTo("one two")
+    }
+
+    @Test
+    fun cutContextMenuAction_withCollapsedPrimary_shouldDeleteSecondarySelectionAndUndoAsOneEntry() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val clipboardManager = context.getSystemService(ClipboardManager::class.java)
+        val state = createState("abcd")
+        val connection = createConnection(state, context)
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(0, 0),
+                secondary = listOf(OffsetRange(2, 4))
+            ),
+            ensureVisible = false
+        )
+
+        assertThat(connection.performContextMenuAction(android.R.id.cut)).isTrue()
+        assertThat(clipboardManager.primaryClip?.getItemAt(0)?.text?.toString()).isEqualTo("cd")
+        assertThat(state.textBuffer.toString()).isEqualTo("ab")
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("abcd")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(2, 4)
+        ).inOrder()
     }
 
     private fun createState(text: String): EditorState {

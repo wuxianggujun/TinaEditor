@@ -1358,12 +1358,37 @@ class EditorState(
     }
 
     fun selectedText(): String? {
-        val range = selectionRange ?: return null
-        if (range.isEmpty) return null
-        val start = range.start.coerceIn(0, textBuffer.length)
-        val end = range.end.coerceIn(start, textBuffer.length)
-        if (start >= end) return null
-        return textBuffer.substring(start, end)
+        val ranges = selectedTextRanges()
+        if (ranges.isEmpty()) return null
+        return buildString {
+            ranges.forEachIndexed { index, range ->
+                if (index > 0) append('\n')
+                append(textBuffer.substring(range.start, range.end))
+            }
+        }
+    }
+
+    private fun selectedTextRanges(): List<OffsetRange> {
+        val selectedRanges = selectionSet.selections.mapNotNull { selection ->
+            val start = selection.start.coerceIn(0, textBuffer.length)
+            val end = selection.end.coerceIn(start, textBuffer.length)
+            if (start >= end) null else OffsetRange(start, end)
+        }
+        if (selectedRanges.isEmpty()) return emptyList()
+
+        val mergedRanges = ArrayList<OffsetRange>(selectedRanges.size)
+        selectedRanges.forEach { range ->
+            val previous = mergedRanges.lastOrNull()
+            if (previous != null && range.start < previous.end) {
+                mergedRanges[mergedRanges.lastIndex] = OffsetRange(
+                    anchor = previous.start,
+                    caret = maxOf(previous.end, range.end)
+                )
+            } else {
+                mergedRanges += range
+            }
+        }
+        return mergedRanges
     }
 
     fun selectAll() {

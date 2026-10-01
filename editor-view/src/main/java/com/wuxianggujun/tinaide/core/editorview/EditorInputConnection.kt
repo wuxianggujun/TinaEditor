@@ -330,24 +330,24 @@ internal class EditorInputConnection(
     }
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingText") {
+        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingText") { cursorOffset ->
             imeDeleteSurroundingCharRange(
-                cursorOffset = cursorOffset(),
+                cursorOffset = cursorOffset,
                 beforeLength = beforeLength,
                 afterLength = afterLength,
                 documentLength = state.textBuffer.length
-            )?.expandToEditorUnitBoundaries(state.textBuffer)
+            )?.expandToEditorUnitBoundaries(state.textBuffer)?.let { it.start to it.end }
         }
     }
 
     override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
-        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingTextInCodePoints") {
+        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingTextInCodePoints") { cursorOffset ->
             imeDeleteSurroundingCodePointRange(
                 textBuffer = state.textBuffer,
-                cursorOffset = cursorOffset(),
+                cursorOffset = cursorOffset,
                 beforeLength = beforeLength,
                 afterLength = afterLength
-            )?.expandToEditorUnitBoundaries(state.textBuffer)
+            )?.expandToEditorUnitBoundaries(state.textBuffer)?.let { it.start to it.end }
         }
     }
 
@@ -780,20 +780,14 @@ internal class EditorInputConnection(
             android.R.id.copy -> copySelectedTextToClipboard()
 
             android.R.id.cut -> {
-                val (start, end) = selectionOffsets()
-                if (start >= end) {
-                    false
-                } else {
-                    val copied = copySelectedTextToClipboard()
-                    if (copied) {
-                        finishComposingSession()
-                        val changed = state.replaceRange(startOffset = start, endOffset = end, replacement = "")
-                        if (changed) {
-                            onNonInsertEdit()
-                        }
+                val copied = copySelectedTextToClipboard()
+                if (copied) {
+                    finishComposingSession()
+                    if (state.replaceSelection("")) {
+                        onNonInsertEdit()
                     }
-                    copied
                 }
+                copied
             }
 
             android.R.id.paste,
@@ -872,14 +866,27 @@ internal class EditorInputConnection(
 
     private fun deleteSelectionOrSurroundingText(
         reason: String,
-        surroundingRange: () -> ImeDeleteRange?
+        surroundingRange: (Int) -> Pair<Int, Int>?
     ): Boolean {
         ensureComposingSessionValid()
+        if (state.hasMultipleSelections) {
+            val changed = editorDeleteSurroundingMultipleSelections(
+                state = state,
+                reason = reason,
+                resolveRange = surroundingRange
+            )
+            if (changed) onNonInsertEdit()
+            return true
+        }
+
         val selectedRange = state.selectionRange
             ?.takeUnless { it.isEmpty }
             ?.let { ImeDeleteRange(start = it.start, end = it.end) }
             ?.expandToEditorUnitBoundaries(state.textBuffer)
-        val deleteRange = selectedRange ?: surroundingRange() ?: return true
+        val deleteRange = selectedRange ?: surroundingRange(cursorOffset())
+            ?.let { ImeDeleteRange(start = it.first, end = it.second) }
+            ?.expandToEditorUnitBoundaries(state.textBuffer)
+            ?: return true
         if (deleteRange.isEmpty) return true
 
         val changed = state.replaceRange(
@@ -1154,19 +1161,17 @@ internal class EditorInputConnection(
     }
 
     private fun copySelectedTextToClipboard(): Boolean {
-        val (start, end) = selectionOffsets()
-        if (start >= end) {
-            logIme("contextMenu copy ignoredEmptySelection selection=($start,$end)")
+        val manager = clipboardManager ?: return false
+        val selectedText = state.selectedText() ?: run {
+            logIme("contextMenu copy ignoredEmptySelection")
             return false
         }
-        val manager = clipboardManager ?: return false
-        val selectedText = state.textBuffer.substring(start, end)
         manager.setPrimaryClip(
             ClipData.newPlainText("editor-selection", selectedText)
         )
         EditorClipboardBridge.rememberCopiedText(selectedText)
         logIme(
-            "contextMenu copy selection=($start,$end) selectionLen=${end - start} " +
+            "contextMenu copy selectionCount=${state.selectionSet.selections.count { !it.isEmpty }} " +
                 "copiedChars=${selectedText.length}"
         )
         return true

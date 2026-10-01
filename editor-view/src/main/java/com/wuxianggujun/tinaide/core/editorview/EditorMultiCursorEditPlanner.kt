@@ -76,6 +76,23 @@ object EditorMultiCursorEditPlanner {
         }
     )
 
+    fun deleteSurrounding(
+        selectionSet: EditorSelectionSet,
+        documentLength: Int,
+        resolveRange: (Int) -> Pair<Int, Int>?
+    ): EditorEditPlan = plan(
+        selectionSet = selectionSet,
+        documentLength = documentLength,
+        replacement = "",
+        resolveRange = { range, _ ->
+            if (!range.isEmpty) {
+                range.start to range.end
+            } else {
+                resolveRange(range.caret) ?: (range.caret to range.caret)
+            }
+        }
+    )
+
     private fun plan(
         selectionSet: EditorSelectionSet,
         documentLength: Int,
