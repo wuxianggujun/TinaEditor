@@ -201,4 +201,27 @@ class TreeSitterIncrementalSupportTest {
         assertThat(edit.newEndPoint.row).isEqualTo(1)
         assertThat(edit.newEndPoint.column).isEqualTo(10)
     }
+
+    @Test
+    fun toTsInputEdit_shouldPreserveUtf16OffsetsAroundSurrogatePair() {
+        val change = TextChange(
+            startOffset = 2,
+            endOffset = 3,
+            oldText = "x",
+            newText = "y",
+            startLine = 0,
+            startColumn = 2,
+            endLine = 0,
+            endColumn = 3
+        )
+
+        val edit = change.toTsInputEdit()
+
+        assertThat(edit.startByte).isEqualTo(4)
+        assertThat(edit.oldEndByte).isEqualTo(6)
+        assertThat(edit.newEndByte).isEqualTo(6)
+        assertThat(edit.startPoint.column).isEqualTo(4)
+        assertThat(edit.oldEndPoint.column).isEqualTo(6)
+        assertThat(edit.newEndPoint.column).isEqualTo(6)
+    }
 }

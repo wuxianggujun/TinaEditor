@@ -193,6 +193,61 @@ class AsyncTreeSitterLineHighlightTest {
         }
     }
 
+    @Test
+    fun rapidViewportSwitch_shouldResolveLatestWindowWithoutReusingEarlierLineSegments() {
+        val oldWindowPrewarmStarted = CountDownLatch(1)
+        val releaseOldWindowPrewarm = CountDownLatch(1)
+        val newViewportLine = 25_000
+        val lineTextLength = "line00000".length
+        val lineStride = lineTextLength + 1
+        val text = buildViewportDocument(VIEWPORT_LINE_COUNT)
+
+        fixture { _, sourceText, range ->
+            if (range.first == 0 && range.last >= lineStride * 100) {
+                oldWindowPrewarmStarted.countDown()
+                check(releaseOldWindowPrewarm.await(5, TimeUnit.SECONDS)) {
+                    "Timed out waiting to release old viewport prewarm"
+                }
+            }
+            val line = (range.first / lineStride).coerceIn(0, VIEWPORT_LINE_COUNT - 1)
+            listOf(
+                HighlightSpan(
+                    start = range.first,
+                    end = (range.last + 1).coerceAtMost(sourceText.length),
+                    type = if (line == newViewportLine) HighlightType.FUNCTION else HighlightType.KEYWORD,
+                )
+            )
+        }.use { fixture ->
+            try {
+                fixture.state.setViewportHint(0)
+                fixture.state.openDocument(text)
+                waitUntil { oldWindowPrewarmStarted.count == 0L }
+
+                fixture.state.setViewportHint(newViewportLine)
+                fixture.state.setViewportHint(128)
+                fixture.state.setViewportHint(newViewportLine)
+                assertThat(fixture.state.getLineSegments(newViewportLine)).isEmpty()
+
+                releaseOldWindowPrewarm.countDown()
+                waitUntil { fixture.state.getLineSegments(newViewportLine).isNotEmpty() }
+
+                assertThat(fixture.state.getLineSegments(newViewportLine)).containsExactly(
+                    HighlightLineSegment(0, lineTextLength, HighlightType.FUNCTION)
+                )
+                assertThat(fixture.state.getLineSegments(0)).containsExactly(
+                    HighlightLineSegment(0, lineTextLength, HighlightType.KEYWORD)
+                )
+            } finally {
+                releaseOldWindowPrewarm.countDown()
+            }
+        }
+    }
+
+    private fun buildViewportDocument(lineCount: Int): String =
+        (0 until lineCount).joinToString("\n") { lineNumber ->
+            "line${lineNumber.toString().padStart(5, '0')}"
+        }
+
     private fun fixture(capture: (TSNode, String, IntRange) -> List<HighlightSpan>): Fixture {
         val parser = mockk<TSParser>()
         val query = mockk<TSQuery> {
@@ -270,6 +325,7 @@ class AsyncTreeSitterLineHighlightTest {
     private companion object {
         private const val TEXT = "val foo = 1\nsecond"
         private const val EDITED_TEXT = "val bar = 1\nsecond"
+        private const val VIEWPORT_LINE_COUNT = 30_000
         private val FIRST_LINE_RANGE = 0..10
         private val FIRST_LINE_SEGMENT = HighlightLineSegment(0, 11, HighlightType.KEYWORD)
     }
