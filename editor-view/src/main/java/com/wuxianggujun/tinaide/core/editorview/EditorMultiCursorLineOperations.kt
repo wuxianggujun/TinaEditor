@@ -3,6 +3,50 @@ package com.wuxianggujun.tinaide.core.editorview
 import com.wuxianggujun.tinaide.core.textengine.TextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextScanKernel
 
+internal fun editorToggleLineCommentMultipleSelections(
+    state: EditorState,
+    commentToken: String
+): Boolean {
+    if (!state.hasMultipleSelections || commentToken.isBlank()) return false
+
+    val resolution = resolveMultiCursorLineBlocks(state)
+    val lineInfos = resolution.blocks.flatMap { block ->
+        (block.startLine..block.endLine).map { line ->
+            EditorLineCommentTarget(
+                lineStartOffset = state.textBuffer.getLineStart(line),
+                text = state.textBuffer.getLine(line)
+            )
+        }
+    }
+    if (lineInfos.isEmpty()) return false
+
+    val commentEdits = buildLineCommentEdits(
+        lineInfos = lineInfos,
+        commentToken = commentToken,
+        tabSize = state.config.tabSize
+    )
+    if (commentEdits.isEmpty()) return false
+
+    val edits = commentEdits.map { edit ->
+        EditorTextEdit(
+            start = edit.offset,
+            end = edit.offset + edit.oldLength,
+            replacement = edit.replacement
+        )
+    }
+
+    val selectionAfter = mapSelectionSetThroughEdits(
+        selectionSet = state.selectionSet,
+        edits = edits
+    )
+    return applyMultiCursorLineEditPlan(
+        state = state,
+        edits = edits,
+        selectionAfter = selectionAfter,
+        reason = "toggleLineComment"
+    )
+}
+
 internal fun editorIndentOrOutdentMultipleSelectionsByTab(
     state: EditorState,
     outdent: Boolean

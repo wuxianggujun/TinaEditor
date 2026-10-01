@@ -814,6 +814,9 @@ internal fun editorToggleLineComment(
     commentToken: String
 ): Boolean {
     if (commentToken.isBlank()) return false
+    if (state.hasMultipleSelections) {
+        return editorToggleLineCommentMultipleSelections(state, commentToken)
+    }
     state.cancelSnippet()
 
     val range = state.selectionRange
@@ -839,59 +842,18 @@ internal fun editorToggleLineComment(
     }
 
     val lineInfos = (startLine..endLine).map { lineIndex ->
-        LineCommentTargetLine(
+        EditorLineCommentTarget(
             lineStartOffset = state.textBuffer.getLineStart(lineIndex),
             text = state.textBuffer.getLine(lineIndex)
         )
     }
     if (lineInfos.isEmpty()) return false
 
-    val shouldUncomment = lineInfos
-        .asSequence()
-        .map { it.text }
-        .filter { it.isNotBlank() }
-        .all { line ->
-            val indent = TextScanKernel
-                .scanLineWhitespace(line, state.config.tabSize)
-                .leadingWhitespaceEnd
-            line.substring(indent).startsWith(commentToken)
-        }
-
-    val edits = mutableListOf<LineCommentOffsetEdit>()
-    lineInfos.forEach { lineInfo ->
-        val line = lineInfo.text
-        if (line.isBlank()) {
-            return@forEach
-        }
-
-        val indent = TextScanKernel
-            .scanLineWhitespace(line, state.config.tabSize)
-            .leadingWhitespaceEnd
-        val rest = line.substring(indent)
-        when {
-            shouldUncomment && rest.startsWith(commentToken) -> {
-                val afterToken = rest.drop(commentToken.length)
-                val optionalSpaceLength = if (afterToken.startsWith(" ")) 1 else 0
-                val removeLength = commentToken.length + optionalSpaceLength
-                edits += LineCommentOffsetEdit(
-                    offset = lineInfo.lineStartOffset + indent,
-                    oldLength = removeLength,
-                    replacement = ""
-                )
-            }
-
-            !shouldUncomment -> {
-                val prefix = "$commentToken "
-                edits += LineCommentOffsetEdit(
-                    offset = lineInfo.lineStartOffset + indent,
-                    oldLength = 0,
-                    replacement = prefix
-                )
-            }
-
-            else -> Unit
-        }
-    }
+    val edits = buildLineCommentEdits(
+        lineInfos = lineInfos,
+        commentToken = commentToken,
+        tabSize = state.config.tabSize
+    )
 
     val segmentStartOffset = state.textBuffer.getLineStart(startLine)
     val segmentEndOffset = state.textBuffer.getLineEnd(endLine)
@@ -953,47 +915,6 @@ internal fun editorToggleLineComment(
         state.moveCursorTo(cursorAfterEdit)
     }
     return true
-}
-
-private data class LineCommentTargetLine(
-    val lineStartOffset: Int,
-    val text: String
-)
-
-private data class LineCommentOffsetEdit(
-    val offset: Int,
-    val oldLength: Int,
-    val replacement: String
-) {
-    val newLength: Int get() = replacement.length
-    val delta: Int get() = newLength - oldLength
-}
-
-private fun adjustOffsetAfterLineCommentEdits(
-    offset: Int,
-    edits: List<LineCommentOffsetEdit>,
-    textLength: Int
-): Int {
-    var delta = 0
-    for (edit in edits.sortedBy { it.offset }) {
-        if (edit.oldLength == 0) {
-            if (offset >= edit.offset) {
-                delta += edit.newLength
-            }
-            continue
-        }
-
-        if (offset < edit.offset) {
-            break
-        }
-
-        val editEnd = edit.offset + edit.oldLength
-        if (offset <= editEnd) {
-            return (edit.offset + delta).coerceIn(0, textLength)
-        }
-        delta += edit.delta
-    }
-    return (offset + delta).coerceIn(0, textLength)
 }
 
 /**

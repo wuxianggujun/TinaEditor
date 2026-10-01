@@ -79,6 +79,15 @@ class EditorToggleLineCommentTest {
         assertThat(state.cursorOffset).isEqualTo(4)
     }
 
+    @Test
+    fun toggleLineComment_withMixedLines_shouldNotDoubleCommentExistingLines() {
+        val state = createState("// first\n// second\nthird")
+        state.selectRange(startOffset = 1, endOffset = state.textBuffer.length)
+
+        assertThat(state.toggleLineComment("//")).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("// first\n// second\n// third")
+    }
+
     private fun createState(text: String): EditorState {
         val buffer = RopeTextBuffer(text)
         return EditorState(buffer)
