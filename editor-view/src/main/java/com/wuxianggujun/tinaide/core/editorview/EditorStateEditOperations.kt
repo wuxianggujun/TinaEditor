@@ -1003,6 +1003,13 @@ internal fun editorIndentOrOutdentSelectionByTab(
     state: EditorState,
     outdent: Boolean
 ): Boolean {
+    if (state.hasMultipleSelections) {
+        return editorIndentOrOutdentMultipleSelectionsByTab(
+            state = state,
+            outdent = outdent
+        )
+    }
+
     val lineCount = state.textBuffer.lineCount
     if (lineCount <= 0) return false
 

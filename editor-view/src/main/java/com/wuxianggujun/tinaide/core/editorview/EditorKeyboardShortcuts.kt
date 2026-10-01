@@ -127,7 +127,7 @@ internal fun handleEditorShortcut(
                     return true
                 }
 
-                if (hasSelection) {
+                if (hasSelection || state.hasMultipleSelections) {
                     onBeforeTextEdit()
                     val changed = editorIndentOrOutdentSelectionByTab(
                         state = state,
@@ -565,6 +565,9 @@ private fun KeyEvent.requestsKeyboardContextMenu(): Boolean {
 }
 
 private fun duplicateSelectedLines(state: EditorState): Boolean {
+    if (state.hasMultipleSelections) {
+        return editorDuplicateMultipleSelectedLines(state)
+    }
     val block = resolveSelectedLineBlock(state)
     val blockText = state.textBuffer.substring(block.startOffset, block.endOffset)
     val duplicateText = if (
@@ -609,6 +612,9 @@ private fun moveSelectedLines(
     state: EditorState,
     direction: Int
 ): Boolean {
+    if (state.hasMultipleSelections) {
+        return editorMoveMultipleSelectedLines(state, direction)
+    }
     val lineCount = state.textBuffer.lineCount
     if (lineCount <= 1) return false
     val block = resolveSelectedLineBlock(state)

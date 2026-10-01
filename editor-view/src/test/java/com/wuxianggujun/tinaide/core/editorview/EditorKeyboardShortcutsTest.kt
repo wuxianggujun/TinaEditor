@@ -789,6 +789,138 @@ class EditorKeyboardShortcutsTest {
     }
 
     @Test
+    fun handleEditorShortcut_shouldIndentEveryMultiCursorLineWithTab() {
+        val state = createState("a\n  b\nc")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(1, 1),
+                secondary = listOf(OffsetRange(2, 2))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(keyCode = AndroidKeyEvent.KEYCODE_TAB)
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("    a\n      b\nc")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(5, 5),
+            OffsetRange(10, 10)
+        ).inOrder()
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldOutdentEveryMultiCursorLineWithShiftTab() {
+        val state = createState("    a\n\tb\nc")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(5, 5),
+                secondary = listOf(OffsetRange(7, 7))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_TAB,
+                metaState = AndroidKeyEvent.META_SHIFT_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\nb\nc")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(1, 1),
+            OffsetRange(2, 2)
+        ).inOrder()
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldDuplicateEveryMultiCursorLineWithCtrlShiftD() {
+        val state = createState("a\nb\nc\nd\ne")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(2, 2),
+                secondary = listOf(OffsetRange(6, 6))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_D,
+                metaState = AndroidKeyEvent.META_CTRL_ON or AndroidKeyEvent.META_SHIFT_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\nb\nb\nc\nd\nd\ne")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(4, 4),
+            OffsetRange(10, 10)
+        ).inOrder()
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldMergeMultiCursorSelectionsOnSameLineBeforeDuplicating() {
+        val state = createState("a\nbc\nd")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(2, 2),
+                secondary = listOf(OffsetRange(3, 3))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_D,
+                metaState = AndroidKeyEvent.META_CTRL_ON or AndroidKeyEvent.META_SHIFT_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\nbc\nbc\nd")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(5, 5),
+            OffsetRange(6, 6)
+        ).inOrder()
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldDuplicateMultiCursorCrLfLinesWithOriginalSeparator() {
+        val state = createState("a\r\nb\r\nc\r\nd")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(3, 3),
+                secondary = listOf(OffsetRange(9, 9))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_D,
+                metaState = AndroidKeyEvent.META_CTRL_ON or AndroidKeyEvent.META_SHIFT_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\r\nb\r\nb\r\nc\r\nd\r\nd")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(6, 6),
+            OffsetRange(15, 15)
+        ).inOrder()
+    }
+
+    @Test
     fun handleEditorShortcut_shouldMoveCurrentLineUpWithAltDirection() {
         val state = createState("one\ntwo\nthree")
         state.moveCursorTo(state.textBuffer.positionToOffset(1, 1))
@@ -845,6 +977,112 @@ class EditorKeyboardShortcutsTest {
         assertThat(consumed).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo("b\nc\na\nd")
         assertThat(state.selectionRange).isEqualTo(OffsetRange(anchor = 0, caret = 3))
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldMoveEveryMultiCursorLineUpTogether() {
+        val state = createState("a\nb\nc\nd\ne")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(2, 2),
+                secondary = listOf(OffsetRange(6, 6))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_DPAD_UP,
+                metaState = AndroidKeyEvent.META_ALT_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("b\na\nd\nc\ne")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(0, 0),
+            OffsetRange(4, 4)
+        ).inOrder()
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldMoveEveryMultiCursorLineDownTogether() {
+        val state = createState("a\nb\nc\nd\ne")
+        state.applySelectionSet(
+            selectionSet = EditorSelectionSet.of(
+                primary = OffsetRange(2, 2),
+                secondary = listOf(OffsetRange(6, 6))
+            ),
+            ensureVisible = false
+        )
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                metaState = AndroidKeyEvent.META_ALT_ON
+            )
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\nc\nb\ne\nd")
+        assertThat(state.selectionSet.selections).containsExactly(
+            OffsetRange(4, 4),
+            OffsetRange(8, 8)
+        ).inOrder()
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldKeepMultiCursorLineMoveAtomicAtBoundary() {
+        val state = createState("a\nb\nc")
+        val originalSelections = EditorSelectionSet.of(
+            primary = OffsetRange(0, 0),
+            secondary = listOf(OffsetRange(2, 2))
+        )
+        state.applySelectionSet(originalSelections, ensureVisible = false)
+        var afterTextEditCalled = false
+
+        val consumed = handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_DPAD_UP,
+                metaState = AndroidKeyEvent.META_ALT_ON
+            ),
+            onAfterTextEdit = { afterTextEditCalled = true }
+        )
+
+        assertThat(consumed).isTrue()
+        assertThat(afterTextEditCalled).isFalse()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\nb\nc")
+        assertThat(state.selectionSet).isEqualTo(originalSelections)
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldRestoreAllMultiCursorSelectionsThroughUndoRedo() {
+        val state = createState("a\nb\nc\nd\ne")
+        val originalSelections = EditorSelectionSet.of(
+            primary = OffsetRange(2, 2),
+            secondary = listOf(OffsetRange(6, 6))
+        )
+        state.applySelectionSet(originalSelections, ensureVisible = false)
+
+        handleShortcut(
+            state = state,
+            event = keyDownEvent(
+                keyCode = AndroidKeyEvent.KEYCODE_D,
+                metaState = AndroidKeyEvent.META_CTRL_ON or AndroidKeyEvent.META_SHIFT_ON
+            )
+        )
+        val duplicatedSelections = state.selectionSet
+
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\nb\nc\nd\ne")
+        assertThat(state.selectionSet).isEqualTo(originalSelections)
+
+        assertThat(state.redo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a\nb\nb\nc\nd\nd\ne")
+        assertThat(state.selectionSet).isEqualTo(duplicatedSelections)
     }
 
     @Test

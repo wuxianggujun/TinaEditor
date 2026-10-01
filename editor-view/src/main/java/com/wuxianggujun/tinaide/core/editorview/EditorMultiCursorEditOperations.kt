@@ -73,7 +73,7 @@ private fun applyMultiCursorEditPlan(
     return true
 }
 
-private fun EditorSelectionSet.toTextSelectionSnapshot(): TextSelectionSnapshot =
+internal fun EditorSelectionSet.toTextSelectionSnapshot(): TextSelectionSnapshot =
     TextSelectionSnapshot(
         anchor = primary.anchor,
         caret = primary.caret,
