@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.core.editorview
 
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Picture
 import androidx.compose.ui.geometry.Offset
@@ -59,7 +60,7 @@ internal class EditorMinimapRenderer {
         const val MIN_ROW_HEIGHT_PX = 1.5f
         const val ROW_HEIGHT_RATIO = 0.25f
         const val MAX_ROW_HEIGHT_RATIO = 0.5f
-        const val CHAR_WIDTH_RATIO = 0.16f
+        const val CHAR_WIDTH_RATIO = 0.14f
         const val THUMB_MIN_HEIGHT_DP = 24f
         const val DIVIDER_WIDTH_PX = 1f
 
@@ -80,8 +81,12 @@ internal class EditorMinimapRenderer {
     private var dpThumbMinHeight = 0f
     private var dpMinCanvasWidth = 0f
 
-    private val segmentPaint = Paint().apply { style = Paint.Style.FILL }
-    private val thumbPaint = Paint().apply { style = Paint.Style.FILL }
+    private val segmentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val thumbPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val thumbBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1f
+    }
 
     private val rowsPicture = Picture()
     private var rowsCacheKey: MinimapRowsCacheKey? = null
@@ -148,7 +153,7 @@ internal class EditorMinimapRenderer {
         colorScheme: EditorColorScheme
     ) {
         drawScope.drawRect(
-            color = colorScheme.gutterBackground,
+            color = colorScheme.background,
             topLeft = Offset(layout.left, layout.top),
             size = Size(layout.width, layout.height)
         )
@@ -274,6 +279,9 @@ internal class EditorMinimapRenderer {
         if (safeStart >= safeEnd) return
 
         segmentPaint.color = color
+        val barHeight = minimapBarHeight(rowBottom - rowTop)
+        val barTop = rowTop + ((rowBottom - rowTop) - barHeight) * 0.5f
+        val barBottom = barTop + barHeight
         var runStart = -1
         for (column in safeStart until safeEnd) {
             if (lineText[column].isWhitespace()) {
@@ -285,8 +293,8 @@ internal class EditorMinimapRenderer {
                         left = left,
                         charScale = charScale,
                         right = right,
-                        rowTop = rowTop,
-                        rowBottom = rowBottom
+                        rowTop = barTop,
+                        rowBottom = barBottom
                     )
                     runStart = -1
                 }
@@ -302,8 +310,8 @@ internal class EditorMinimapRenderer {
                 left = left,
                 charScale = charScale,
                 right = right,
-                rowTop = rowTop,
-                rowBottom = rowBottom
+                rowTop = barTop,
+                rowBottom = barBottom
             )
         }
     }
@@ -326,6 +334,9 @@ internal class EditorMinimapRenderer {
         canvas.drawRect(runLeft, rowTop, runRight, rowBottom, segmentPaint)
     }
 
+    private fun minimapBarHeight(rowHeight: Float): Float =
+        (rowHeight * 0.32f).coerceIn(1f, 2.5f)
+
     private fun paintLineSegments(
         canvas: Canvas,
         segments: List<HighlightLineSegment>,
@@ -338,12 +349,15 @@ internal class EditorMinimapRenderer {
     ) {
         if (segments.isEmpty()) return
         val syntax = colorScheme.syntax
+        val barHeight = minimapBarHeight(rowBottom - rowTop)
+        val barTop = rowTop + ((rowBottom - rowTop) - barHeight) * 0.5f
+        val barBottom = barTop + barHeight
         for (segment in segments) {
             val segLeft = left + segment.startColumn * charScale
             if (segLeft >= right) continue
             val segRight = (left + segment.endColumn * charScale).coerceAtMost(right)
             segmentPaint.color = syntax.colorOf(segment.type).toArgb()
-            canvas.drawRect(segLeft, rowTop, segRight, rowBottom, segmentPaint)
+            canvas.drawRect(segLeft, barTop, segRight, barBottom, segmentPaint)
         }
     }
 
@@ -352,7 +366,11 @@ internal class EditorMinimapRenderer {
         layout: MinimapLayout,
         colorScheme: EditorColorScheme
     ) {
-        thumbPaint.color = colorScheme.scrollbarThumb.toArgb()
+        // The viewport is an indicator, not a scrollbar thumb. Keep it translucent so
+        // syntax bars remain visible underneath, matching VS Code's minimap behavior.
+        val thumbColor = colorScheme.scrollbarThumb.toArgb()
+        thumbPaint.color = withAlpha(thumbColor, 0x20)
+        thumbBorderPaint.color = withAlpha(thumbColor, 0x88)
         canvas.drawRect(
             layout.left,
             layout.thumbTopPx,
@@ -360,7 +378,17 @@ internal class EditorMinimapRenderer {
             layout.thumbTopPx + layout.thumbHeightPx,
             thumbPaint
         )
+        canvas.drawRect(
+            layout.left + 0.5f,
+            layout.thumbTopPx + 0.5f,
+            layout.right - 0.5f,
+            layout.thumbTopPx + layout.thumbHeightPx - 0.5f,
+            thumbBorderPaint
+        )
     }
+
+    private fun withAlpha(argb: Int, alpha: Int): Int =
+        Color.argb(alpha.coerceIn(0, 255), Color.red(argb), Color.green(argb), Color.blue(argb))
 
     private data class MinimapRowsCacheKey(
         val textVersion: Long,

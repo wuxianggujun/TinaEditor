@@ -183,12 +183,30 @@ class EditorMinimapRendererTest {
         val colorScheme = EditorColorScheme.builtinDark()
         val bitmap = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
-        canvas.drawColor(colorScheme.gutterBackground.toArgb())
+        canvas.drawColor(colorScheme.background.toArgb())
 
         renderer.paintRows(canvas, layout, state, colorScheme)
 
-        assertThat(bitmap.getPixel(layout.left.toInt(), 1))
-            .isNotEqualTo(colorScheme.gutterBackground.toArgb())
+        val hasCodePixel = (0 until layout.height.toInt()).any { y ->
+            bitmap.getPixel(layout.left.toInt(), y) != colorScheme.background.toArgb()
+        }
+        assertThat(hasCodePixel).isTrue()
+    }
+
+    @Test
+    fun paintThumb_usesTranslucentViewportOverlay() {
+        val state = createState(lines(20, "val x = 0"))
+        val layout = renderer.calculateLayout(state, 400f, 1000f, density)!!
+        val colorScheme = EditorColorScheme.builtinDark()
+        val bitmap = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(colorScheme.background.toArgb())
+
+        renderer.paintThumb(canvas, layout, colorScheme)
+
+        val centerPixel = bitmap.getPixel(layout.left.toInt() + 2, layout.thumbTopPx.toInt() + 2)
+        assertThat(centerPixel).isNotEqualTo(colorScheme.scrollbarThumb.toArgb())
+        assertThat(centerPixel).isNotEqualTo(colorScheme.background.toArgb())
     }
 
     private fun paintIntoPicture(layout: MinimapLayout, state: EditorState) {
