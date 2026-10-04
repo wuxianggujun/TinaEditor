@@ -57,6 +57,7 @@ internal class EditorGestureCoordinator(
             gutterX < zones.lineNumberEndX -> {
                 gestureHandler.clearTextTapTracking()
                 if (state.multiCursorTapMode || isAltPressed) {
+                    interactionController.prepareForExternalEdit()
                     val column = state.cursorPosition.column.coerceAtMost(state.textBuffer.getLine(line).length)
                     state.toggleCursorAt(state.textBuffer.positionToOffset(line, column))
                     interactionController.requestEditorFocus()

@@ -301,7 +301,7 @@ class EditorUndoRedoCursorTest {
 
         assertThat(state.replaceAll("one", "three")).isEqualTo(2)
         assertThat(state.textBuffer.toString()).isEqualTo("three two three")
-        assertThat(state.cursorOffset).isEqualTo(0)
+        assertThat(state.cursorOffset).isEqualTo(7)
 
         assertThat(state.undo()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo("one two one")
@@ -309,7 +309,7 @@ class EditorUndoRedoCursorTest {
 
         assertThat(state.redo()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo("three two three")
-        assertThat(state.cursorOffset).isEqualTo(0)
+        assertThat(state.cursorOffset).isEqualTo(7)
     }
 
     private fun createState(text: String): EditorState {

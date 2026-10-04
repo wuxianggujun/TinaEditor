@@ -68,6 +68,32 @@ class EditorGestureCoordinatorCtrlClickTest {
         assertThat(fixture.state.cursorColumn).isEqualTo(2)
     }
 
+    @Test
+    fun altClick_shouldToggleCursorWithoutRequestingDefinition() {
+        val fixture = createFixture("alpha beta")
+        var requests = 0
+        fixture.state.onRequestGotoDefinition = { requests++ }
+        val position = fixture.positionForColumn(2)
+        fixture.coordinator.onTap(position, isAltPressed = true)
+        assertThat(fixture.state.selectionSet.selections).hasSize(2)
+        assertThat(fixture.state.cursorOffset).isEqualTo(0)
+        fixture.coordinator.onTap(position, isAltPressed = true)
+        assertThat(fixture.state.hasMultipleSelections).isFalse()
+        assertThat(requests).isEqualTo(0)
+    }
+
+    @Test
+    fun rectangleSelection_shouldCreateMeasuredRangeForEachVisualRow() {
+        val fixture = createFixture("abcd\nabcd")
+        fixture.coordinator.onRectangleSelection(
+            fixture.positionForColumn(1),
+            fixture.positionForColumn(3).copy(y = fixture.lineHeightPx * 1.5f)
+        )
+        assertThat(fixture.state.selectionSet.selections)
+            .containsExactly(OffsetRange(1, 3), OffsetRange(6, 8)).inOrder()
+        assertThat(fixture.state.selectionSet.primary).isEqualTo(OffsetRange(6, 8))
+    }
+
     private fun createFixture(text: String): GestureFixture {
         val state = EditorState(RopeTextBuffer(text))
         val density = Density(1f)
