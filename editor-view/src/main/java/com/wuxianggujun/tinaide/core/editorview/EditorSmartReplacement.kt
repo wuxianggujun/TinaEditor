@@ -127,7 +127,13 @@ internal object EditorSmartReplacement {
 
         val extraIndent = if (shouldIndentMore) indentUnit else ""
         val resolvedReplacement = "\n" + baseIndent + extraIndent
-        return EditorResolvedReplacement(resolvedReplacement, cursorOffsetAfterInsert = null)
+        // The generated indentation is part of the user-visible newline edit. Some IMEs
+        // report newCursorPosition == 0 for Enter, which would otherwise leave the caret
+        // before these spaces and make the next character appear before the indentation.
+        return EditorResolvedReplacement(
+            resolvedReplacement,
+            cursorOffsetAfterInsert = startOffset + resolvedReplacement.length
+        )
     }
 
     private fun charAfterOffset(state: EditorState, offset: Int): Char? {

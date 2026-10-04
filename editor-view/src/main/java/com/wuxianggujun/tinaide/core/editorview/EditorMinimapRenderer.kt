@@ -198,7 +198,7 @@ internal class EditorMinimapRenderer {
         state: EditorState,
         colorScheme: EditorColorScheme
     ) {
-        val highlighter = state.highlighter ?: return
+        val highlighter = state.highlighter
         val rowHeight = layout.rowHeightPx
         val charScale = (state.charWidthPx * CHAR_WIDTH_RATIO).coerceAtLeast(0.5f)
         val right = layout.right
@@ -216,9 +216,31 @@ internal class EditorMinimapRenderer {
             val docLine = state.docLineForVisualLine(row)
             val rowTop = layout.top + row * rowHeight
             val rowBottom = rowTop + rowHeight
+            val lineText = state.textBuffer.getLine(docLine)
+            val startColumn = if (wordWrap) state.visualLineStartColumn(row) else 0
+            val endColumn = if (wordWrap) {
+                state.visualLineEndColumn(row).coerceIn(startColumn, lineText.length)
+            } else {
+                lineText.length
+            }
+
+            // Always render the document shape, even before syntax highlighting is ready
+            // (or when the host does not provide a highlighter). Token overlays are optional.
+            paintLineText(
+                canvas = canvas,
+                lineText = lineText,
+                startColumn = startColumn,
+                endColumn = endColumn,
+                color = colorScheme.syntax.defaultText.toArgb(),
+                left = layout.left,
+                charScale = charScale,
+                right = right,
+                rowTop = rowTop,
+                rowBottom = rowBottom
+            )
             // 自动换行时，折行延续行不重复画整行的 token；步长采样时每行都画，否则采样行可能整行空白。
             val drawTokens = stride > 1 || !wordWrap || docLine != lastDocLine
-            if (drawTokens) {
+            if (drawTokens && highlighter != null) {
                 paintLineSegments(
                     canvas = canvas,
                     segments = highlighter.getLineSegments(docLine),
@@ -233,6 +255,75 @@ internal class EditorMinimapRenderer {
             lastDocLine = docLine
             row += stride
         }
+    }
+
+    private fun paintLineText(
+        canvas: Canvas,
+        lineText: String,
+        startColumn: Int,
+        endColumn: Int,
+        color: Int,
+        left: Float,
+        charScale: Float,
+        right: Float,
+        rowTop: Float,
+        rowBottom: Float
+    ) {
+        val safeStart = startColumn.coerceIn(0, lineText.length)
+        val safeEnd = endColumn.coerceIn(safeStart, lineText.length)
+        if (safeStart >= safeEnd) return
+
+        segmentPaint.color = color
+        var runStart = -1
+        for (column in safeStart until safeEnd) {
+            if (lineText[column].isWhitespace()) {
+                if (runStart >= 0) {
+                    drawMinimapRun(
+                        canvas = canvas,
+                        startColumn = runStart,
+                        endColumn = column,
+                        left = left,
+                        charScale = charScale,
+                        right = right,
+                        rowTop = rowTop,
+                        rowBottom = rowBottom
+                    )
+                    runStart = -1
+                }
+            } else if (runStart < 0) {
+                runStart = column
+            }
+        }
+        if (runStart >= 0) {
+            drawMinimapRun(
+                canvas = canvas,
+                startColumn = runStart,
+                endColumn = safeEnd,
+                left = left,
+                charScale = charScale,
+                right = right,
+                rowTop = rowTop,
+                rowBottom = rowBottom
+            )
+        }
+    }
+
+    private fun drawMinimapRun(
+        canvas: Canvas,
+        startColumn: Int,
+        endColumn: Int,
+        left: Float,
+        charScale: Float,
+        right: Float,
+        rowTop: Float,
+        rowBottom: Float
+    ) {
+        val runLeft = left + startColumn * charScale
+        if (runLeft >= right) return
+        val runRight = (left + endColumn * charScale)
+            .coerceAtMost(right)
+            .coerceAtLeast(runLeft + 0.5f)
+        canvas.drawRect(runLeft, rowTop, runRight, rowBottom, segmentPaint)
     }
 
     private fun paintLineSegments(

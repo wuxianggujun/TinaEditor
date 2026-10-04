@@ -1,7 +1,10 @@
 package com.wuxianggujun.tinaide.core.editorview
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Picture
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
@@ -171,6 +174,21 @@ class EditorMinimapRendererTest {
 
         assertThat(highlighter.requestedLines.size)
             .isAtMost(EditorMinimapRenderer.MAX_HIGHLIGHT_ROWS)
+    }
+
+    @Test
+    fun paintRows_withoutHighlighter_stillDrawsDocumentShape() {
+        val state = createState(lines(20, "val x = 0"))
+        val layout = renderer.calculateLayout(state, 400f, 1000f, density)!!
+        val colorScheme = EditorColorScheme.builtinDark()
+        val bitmap = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(colorScheme.gutterBackground.toArgb())
+
+        renderer.paintRows(canvas, layout, state, colorScheme)
+
+        assertThat(bitmap.getPixel(layout.left.toInt(), 1))
+            .isNotEqualTo(colorScheme.gutterBackground.toArgb())
     }
 
     private fun paintIntoPicture(layout: MinimapLayout, state: EditorState) {

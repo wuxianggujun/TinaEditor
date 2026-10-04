@@ -606,6 +606,24 @@ class EditorInputConnectionEditTest {
     }
 
     @Test
+    fun commitText_newlineWithZeroRelativeCursor_shouldPlaceInputAfterAutoIndent() {
+        val state = EditorState(
+            textBuffer = RopeTextBuffer("fun main() {\n    println()"),
+            config = EditorConfig(autoIndent = true, tabSize = 4, insertSpacesForTabs = true)
+        )
+        state.moveCursorTo(state.textBuffer.length)
+        val connection = createConnection(state)
+
+        // A few IMEs report 0 for the relative cursor position when committing Enter.
+        connection.commitText("\n", 0)
+        connection.commitText("p", 1)
+
+        assertThat(state.textBuffer.toString())
+            .isEqualTo("fun main() {\n    println()\n    p")
+        assertThat(state.cursorOffset).isEqualTo(state.textBuffer.length)
+    }
+
+    @Test
     fun pasteContextMenuAction_shouldReplaceSelection() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val clipboardManager = context.getSystemService(ClipboardManager::class.java)
