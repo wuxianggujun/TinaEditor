@@ -63,7 +63,7 @@ internal class DiagnosticRenderer(
         val desiredAmplitude = desiredAmplitudePx
         val sw = strokeWidthPx
 
-        state.visibleLines.forEach { visualLine ->
+        frameContext.visibleLines.forEach { visualLine ->
             val line = state.docLineForVisualLine(visualLine)
             if (line >= state.textBuffer.lineCount) return@forEach
             val diagnostics = diagByLine[line].orEmpty()
@@ -88,7 +88,7 @@ internal class DiagnosticRenderer(
                 paint = textPaint,
             )
             val segmentStartXInText = prefixLayout.segmentStartAdvance(visualStartColumn)
-            val lineTop = state.visualLineTopInViewport(visualLine)
+            val lineTop = frameContext.visualLineTopInViewport(visualLine)
             val lineBottom = lineTop + state.lineHeightPx
             val baselineY = lineTop + state.lineHeightPx * 0.78f
 
@@ -105,7 +105,7 @@ internal class DiagnosticRenderer(
             drawScope.clipRect(
                 left = textStartX,
                 top = clipTop,
-                right = drawScope.size.width + state.scrollOffsetXPx,
+                right = drawScope.size.width + frameContext.scrollOffsetXPx,
                 bottom = clipBottom
             ) {
                 segments.forEach { segment ->

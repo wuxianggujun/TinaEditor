@@ -30,7 +30,7 @@ internal class MatchingBracketHighlightRenderer {
         val cursorOffset = state.cursorOffset.coerceIn(0, textBuffer.length)
         val match = frameContext.bracketSnapshotCache.resolveMatchingBracket(
             textBuffer = textBuffer,
-            visibleLines = state.visibleDocumentLines,
+            visibleLines = frameContext.visibleDocumentLines,
             cursorOffset = cursorOffset
         ) ?: return
 
@@ -112,7 +112,7 @@ internal class MatchingBracketHighlightRenderer {
             paint = textPaint,
         )
         val visualLine = state.visualLineForDocLine(line)
-        val top = state.visualLineTopInViewport(visualLine)
+        val top = frameContext.visualLineTopInViewport(visualLine)
         val maxColumn = prefixLayout.length
         val height = state.lineHeightPx
 

@@ -31,7 +31,9 @@ internal class CursorRenderer {
             lineLayoutCache = lineLayoutCache,
             lineTextProvider = frameContext::lineText,
             foldEndLineInfo = foldEndLineInfo,
-            textScanCache = frameContext.textScanCache
+            textScanCache = frameContext.textScanCache,
+            visibleLines = frameContext.visibleLines,
+            scrollOffsetPx = frameContext.scrollOffsetPx
         ) ?: return
         drawScope.drawLine(
             color = state.colorScheme.cursor,
@@ -59,7 +61,9 @@ internal class CursorRenderer {
                 lineLayoutCache = lineLayoutCache,
                 lineTextProvider = frameContext::lineText,
                 textScanCache = frameContext.textScanCache,
-                cursorOffset = selection.caret
+                cursorOffset = selection.caret,
+                visibleLines = frameContext.visibleLines,
+                scrollOffsetPx = frameContext.scrollOffsetPx
             ) ?: return@forEach
             drawScope.drawLine(
                 color = state.colorScheme.cursor.copy(alpha = 0.78f),
@@ -88,7 +92,9 @@ internal class CursorRenderer {
             lineLayoutCache = lineLayoutCache,
             lineTextProvider = frameContext::lineText,
             foldEndLineInfo = foldEndLineInfo,
-            textScanCache = frameContext.textScanCache
+            textScanCache = frameContext.textScanCache,
+            visibleLines = frameContext.visibleLines,
+            scrollOffsetPx = frameContext.scrollOffsetPx
         ) ?: return
         val handleColor = state.colorScheme.selectionHandle
         // 让连杆明显一点，但仍轻微插入圆点内部，观感更像 Sora 的 side-drop handle。

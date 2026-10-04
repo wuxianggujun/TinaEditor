@@ -31,7 +31,9 @@ internal fun resolveCursorHandleLayout(
     lineTextProvider: (Int) -> String,
     foldEndLineInfo: FoldEndLineCursorInfo? = null,
     textScanCache: EditorTextScanCache,
-    cursorOffset: Int = state.cursorOffset
+    cursorOffset: Int = state.cursorOffset,
+    visibleLines: IntRange = state.visibleLines,
+    scrollOffsetPx: Float = state.scrollOffsetPx
 ): CursorHandleLayout? {
     val anchor = resolveCursorVisualAnchor(
         state = state,
@@ -41,9 +43,10 @@ internal fun resolveCursorHandleLayout(
         lineTextProvider = lineTextProvider,
         foldEndLineInfo = foldEndLineInfo,
         textScanCache = textScanCache,
-        cursorOffset = cursorOffset
+        cursorOffset = cursorOffset,
+        scrollOffsetPx = scrollOffsetPx
     ) ?: return null
-    if (anchor.visualLine !in state.visibleLines) return null
+    if (anchor.visualLine !in visibleLines) return null
 
     val minRadius = minOf(
         state.config.selectionHandleMinRadiusPx,

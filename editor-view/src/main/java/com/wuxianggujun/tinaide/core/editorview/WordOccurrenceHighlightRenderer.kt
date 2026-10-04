@@ -87,7 +87,7 @@ internal class WordOccurrenceHighlightRenderer {
         var cachedText = ""
         var cachedMatches: IntArray? = null
         var cachedLayout: EditorLineLayoutCache.PrefixLayout? = null
-        for (visualLine in state.visibleLines) {
+        for (visualLine in frameContext.visibleLines) {
             val line = state.docLineForVisualLine(visualLine)
             if (line >= textBuffer.lineCount) continue
             if (line != cachedLine) {
@@ -111,7 +111,7 @@ internal class WordOccurrenceHighlightRenderer {
                 textVersion = textVersion,
                 paint = textPaint,
             ).also { cachedLayout = it }
-            val top = state.visualLineTopInViewport(visualLine)
+            val top = frameContext.visualLineTopInViewport(visualLine)
             val segmentStart = prefixLayout.segmentStartAdvance(visualStart)
             while (matchIndex < matches.size) {
                 val idx = matches[matchIndex++]

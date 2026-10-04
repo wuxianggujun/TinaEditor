@@ -112,14 +112,16 @@ class EditorGestureCoordinatorLongPressTest {
             drawScope: DrawScope,
             state: EditorState,
             textPaint: Paint,
-            lineNumberPaint: Paint
+            lineNumberPaint: Paint,
+            viewport: EditorRenderViewport?
         ) = Unit
 
         override fun renderCursorOverlay(
             drawScope: DrawScope,
             state: EditorState,
             textPaint: Paint,
-            lineNumberPaint: Paint
+            lineNumberPaint: Paint,
+            viewport: EditorRenderViewport?
         ) = Unit
 
         override fun contentStartX(state: EditorState, lineNumberPaint: Paint): Float = textStartX

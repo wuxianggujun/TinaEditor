@@ -115,8 +115,8 @@ internal class TextRenderer {
         var cacheMisses = 0
 
         val scheme = state.colorScheme
-        val visibleVisualLines = state.visibleLines
-        val visibleDocLines = state.visibleDocumentLines
+        val visibleVisualLines = frameContext.visibleLines
+        val visibleDocLines = frameContext.visibleDocumentLines
         val rainbowColors = scheme.rainbowBracketColors
         val rainbowEnabled = rainbowColors.isNotEmpty() &&
             rainbowBracketComputer.isEnabled(state.config, state.textBuffer.lineCount)
@@ -153,7 +153,7 @@ internal class TextRenderer {
                 if (line >= state.textBuffer.lineCount) return@forEach
                 val visualStartColumn = state.visualLineStartColumn(visualLine)
                 val visualEndColumn = state.visualLineEndColumn(visualLine).coerceAtLeast(visualStartColumn)
-                val yTop = state.visualLineTopInViewport(visualLine)
+                val yTop = frameContext.visualLineTopInViewport(visualLine)
                 val baselineY = yTop + state.lineHeightPx * 0.78f
                 val lookup = getOrCacheLineText(
                     state = state,

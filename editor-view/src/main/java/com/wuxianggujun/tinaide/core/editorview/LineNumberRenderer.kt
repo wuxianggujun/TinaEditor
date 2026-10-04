@@ -43,7 +43,9 @@ class LineNumberRenderer(
         drawScope: DrawScope,
         state: EditorState,
         textPaint: Paint,
-        widthPx: Float
+        widthPx: Float,
+        visibleLines: IntRange = state.visibleLines,
+        scrollOffsetPx: Float = state.scrollOffsetPx
     ) {
         if (!state.config.showLineNumbers || widthPx <= 0f) return
 
@@ -73,7 +75,7 @@ class LineNumberRenderer(
         activePaint.alpha = 255
 
         drawScope.drawIntoCanvas { canvas ->
-            state.visibleLines.forEach { visualLine ->
+            visibleLines.forEach { visualLine ->
                 val line = state.docLineForVisualLine(visualLine)
                 if (line >= state.textBuffer.lineCount) return@forEach
                 if (state.isVisualLineContinuation(visualLine)) return@forEach
@@ -84,7 +86,7 @@ class LineNumberRenderer(
                     intToString(line + 1)
                 }
 
-                val yTop = state.visualLineTopInViewport(visualLine)
+                val yTop = visualLine * lineHeightPx - scrollOffsetPx
                 val baselineY = yTop + lineHeightPx * 0.78f
                 val gitChange = gitChanges[line]
                 if (gitChange != null) {

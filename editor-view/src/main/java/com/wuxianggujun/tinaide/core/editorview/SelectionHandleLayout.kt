@@ -57,7 +57,8 @@ internal fun resolveSelectionHandleLayout(
     textStartX: Float,
     textPaint: Paint,
     lineLayoutCache: EditorLineLayoutCache,
-    lineTextProvider: (Int) -> String
+    lineTextProvider: (Int) -> String,
+    scrollOffsetPx: Float = state.scrollOffsetPx
 ): SelectionHandleLayout? {
     val range = state.selectionRange ?: return null
     if (range.isEmpty) return null
@@ -80,8 +81,8 @@ internal fun resolveSelectionHandleLayout(
     val endColumn = endPos.column.coerceIn(0, endLineText.length)
     val startVisualLine = state.visualLineForPosition(startLine, startColumn)
     val endVisualLine = state.visualLineForPosition(endLine, endColumn)
-    val startLineBottom = state.visualLineTopInViewport(startVisualLine) + state.lineHeightPx
-    val endLineBottom = state.visualLineTopInViewport(endVisualLine) + state.lineHeightPx
+    val startLineBottom = (startVisualLine + 1) * state.lineHeightPx - scrollOffsetPx
+    val endLineBottom = (endVisualLine + 1) * state.lineHeightPx - scrollOffsetPx
     val textVersion = state.textBuffer.version
     val startPrefixLayout = lineLayoutCache.getPrefixLayout(
         state = state,

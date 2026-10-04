@@ -75,7 +75,7 @@ internal class WhitespaceRenderer {
         var cachedText = ""
         var cachedMarkers: IntArray? = null
         var cachedLayout: EditorLineLayoutCache.PrefixLayout? = null
-        for (visualLine in state.visibleLines) {
+        for (visualLine in frameContext.visibleLines) {
             val line = state.docLineForVisualLine(visualLine)
             if (line >= state.textBuffer.lineCount) continue
             if (line != cachedLine) {
@@ -101,7 +101,7 @@ internal class WhitespaceRenderer {
                 state, line, cachedText, frameContext.textVersion, textPaint,
             ).also { cachedLayout = it }
             val segmentStartAdvance = layout.segmentStartAdvance(startColumn)
-            val centerY = state.visualLineTopInViewport(visualLine) + state.lineHeightPx / 2f
+            val centerY = frameContext.visualLineTopInViewport(visualLine) + state.lineHeightPx / 2f
             var markerIndex = low
             while (markerIndex < markers.size) {
                 val marker = markers[markerIndex++]

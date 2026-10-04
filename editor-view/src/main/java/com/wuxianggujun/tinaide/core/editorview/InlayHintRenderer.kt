@@ -46,7 +46,7 @@ internal class InlayHintRenderer {
 
         drawScope.drawIntoCanvas { canvas ->
             val nativeCanvas = canvas.nativeCanvas
-            state.visibleLines.forEach visualLineLoop@{ visualLine ->
+            frameContext.visibleLines.forEach visualLineLoop@{ visualLine ->
                 val line = state.docLineForVisualLine(visualLine)
                 val hints = hintsByLine[line].orEmpty()
                 if (hints.isEmpty() || line !in 0 until state.textBuffer.lineCount) return@visualLineLoop
@@ -62,7 +62,7 @@ internal class InlayHintRenderer {
                     paint = textPaint,
                 )
                 val segmentStartX = prefixLayout.segmentStartAdvance(visualStartColumn)
-                val lineTop = state.visualLineTopInViewport(visualLine)
+                val lineTop = frameContext.visualLineTopInViewport(visualLine)
                 val boxTop = lineTop + verticalOffset
                 val boxBottom = boxTop + boxHeight
                 val baseline = boxTop + (boxHeight - textHeight) / 2f - fontMetrics.ascent

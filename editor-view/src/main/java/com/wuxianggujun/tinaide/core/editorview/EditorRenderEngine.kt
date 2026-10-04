@@ -9,14 +9,16 @@ internal interface EditorRenderEngine {
         drawScope: DrawScope,
         state: EditorState,
         textPaint: Paint,
-        lineNumberPaint: Paint
+        lineNumberPaint: Paint,
+        viewport: EditorRenderViewport? = null
     )
 
     fun renderCursorOverlay(
         drawScope: DrawScope,
         state: EditorState,
         textPaint: Paint,
-        lineNumberPaint: Paint
+        lineNumberPaint: Paint,
+        viewport: EditorRenderViewport? = null
     )
 
     fun contentStartX(state: EditorState, lineNumberPaint: Paint): Float

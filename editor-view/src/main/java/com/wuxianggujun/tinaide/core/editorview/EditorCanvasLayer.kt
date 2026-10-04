@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -322,20 +323,14 @@ internal fun EditorCanvasLayer(
             } else {
                 drawRect(color = state.colorScheme.background)
 
-                val pivotX = ui.scaleGestureVisualPivotX
-                val pivotY = ui.scaleGestureVisualPivotY
-                val canvas = drawContext.canvas
-                canvas.save()
-                canvas.translate(pivotX, pivotY)
-                canvas.scale(visualScale, visualScale)
-                canvas.translate(-pivotX, -pivotY)
-                renderer.render(
-                    drawScope = this,
+                drawEditorScalePreview(
+                    renderer = renderer,
                     state = state,
                     textPaint = textPaint,
-                    lineNumberPaint = lineNumberPaint
+                    lineNumberPaint = lineNumberPaint,
+                    scale = visualScale,
+                    pivot = Offset(ui.scaleGestureVisualPivotX, ui.scaleGestureVisualPivotY)
                 )
-                canvas.restore()
             }
 
             val scrollbarLayout = scrollbarRenderer.calculateLayout(
@@ -376,24 +371,22 @@ internal fun EditorCanvasLayer(
             val isCursorScaling = cursorScale != 1f
 
             if (isCursorScaling) {
-                val pivotX = ui.scaleGestureVisualPivotX
-                val pivotY = ui.scaleGestureVisualPivotY
-                val canvas = drawContext.canvas
-                canvas.save()
-                canvas.translate(pivotX, pivotY)
-                canvas.scale(cursorScale, cursorScale)
-                canvas.translate(-pivotX, -pivotY)
-            }
-
-            renderer.renderCursorOverlay(
-                drawScope = this,
-                state = state,
-                textPaint = textPaint,
-                lineNumberPaint = lineNumberPaint
-            )
-
-            if (isCursorScaling) {
-                drawContext.canvas.restore()
+                drawEditorScalePreview(
+                    renderer = renderer,
+                    state = state,
+                    textPaint = textPaint,
+                    lineNumberPaint = lineNumberPaint,
+                    scale = cursorScale,
+                    pivot = Offset(ui.scaleGestureVisualPivotX, ui.scaleGestureVisualPivotY),
+                    cursorOverlay = true
+                )
+            } else {
+                renderer.renderCursorOverlay(
+                    drawScope = this,
+                    state = state,
+                    textPaint = textPaint,
+                    lineNumberPaint = lineNumberPaint
+                )
             }
         }
     }

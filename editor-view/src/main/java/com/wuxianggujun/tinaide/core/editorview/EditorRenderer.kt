@@ -62,7 +62,8 @@ internal class EditorRenderer(
         drawScope: DrawScope,
         state: EditorState,
         textPaint: Paint,
-        lineNumberPaint: Paint
+        lineNumberPaint: Paint,
+        viewport: EditorRenderViewport?
     ) {
         val startNs = System.nanoTime()
         val scheme = state.colorScheme
@@ -80,11 +81,11 @@ internal class EditorRenderer(
             size = drawScope.size
         )
 
-        val frameContext = frameContext(state)
+        val frameContext = frameContext(state, viewport)
         if (pinLineNumber) {
             drawScope.drawGutter(
                 scheme = scheme,
-                state = state,
+                frameContext = frameContext,
                 lineNumberPaint = lineNumberPaint,
                 lineNumberWidth = lineNumberWidth,
                 gutterWidth = gutterWidth
@@ -96,7 +97,7 @@ internal class EditorRenderer(
                 right = drawScope.size.width,
                 bottom = drawScope.size.height
             ) {
-                translate(left = -state.scrollOffsetXPx) {
+                translate(left = -frameContext.scrollOffsetXPx) {
                     textStats = drawTextLayers(
                         drawScope = this,
                         frameContext = frameContext,
@@ -112,10 +113,10 @@ internal class EditorRenderer(
                 right = drawScope.size.width,
                 bottom = drawScope.size.height
             ) {
-                translate(left = -state.scrollOffsetXPx) {
+                translate(left = -frameContext.scrollOffsetXPx) {
                     drawGutter(
                         scheme = scheme,
-                        state = state,
+                        frameContext = frameContext,
                         lineNumberPaint = lineNumberPaint,
                         lineNumberWidth = lineNumberWidth,
                         gutterWidth = gutterWidth
@@ -140,7 +141,7 @@ internal class EditorRenderer(
         }
         recordRenderMetrics(
             durationMs = totalMs,
-            visibleLineCount = state.visibleLines.count(),
+            visibleLineCount = frameContext.visibleLines.count(),
             frameStats = textStats
         )
     }
@@ -149,12 +150,13 @@ internal class EditorRenderer(
         drawScope: DrawScope,
         state: EditorState,
         textPaint: Paint,
-        lineNumberPaint: Paint
+        lineNumberPaint: Paint,
+        viewport: EditorRenderViewport?
     ) {
         if (!state.isFocused) return
         val zones = hitZones(state, lineNumberPaint)
         val textStartX = zones.textStartX
-        val frameContext = frameContext(state)
+        val frameContext = frameContext(state, viewport)
 
         val cursorLine = state.cursorPosition.line
         val foldEndLineInfo = if (state.isFoldEndLineVirtuallyVisible(cursorLine)) {
@@ -197,7 +199,7 @@ internal class EditorRenderer(
             right = drawScope.size.width,
             bottom = drawScope.size.height
         ) {
-            translate(left = -state.scrollOffsetXPx) {
+            translate(left = -frameContext.scrollOffsetXPx) {
                 if (state.cursorBlinkVisible) {
                     cursorRenderer.drawCursor(
                         drawScope = this,
@@ -397,7 +399,7 @@ internal class EditorRenderer(
 
     private fun DrawScope.drawGutter(
         scheme: EditorColorScheme,
-        state: EditorState,
+        frameContext: EditorRenderFrameContext,
         lineNumberPaint: Paint,
         lineNumberWidth: Float,
         gutterWidth: Float
@@ -414,8 +416,14 @@ internal class EditorRenderer(
             topLeft = Offset(lineNumberWidth, 0f),
             size = Size(gutterWidth, size.height)
         )
-        lineNumberRenderer.draw(this, state, lineNumberPaint, lineNumberWidth)
-        gutterRenderer.draw(this, state, lineNumberWidth)
+        lineNumberRenderer.draw(
+            this, frameContext.state, lineNumberPaint, lineNumberWidth,
+            frameContext.visibleLines, frameContext.scrollOffsetPx
+        )
+        gutterRenderer.draw(
+            this, frameContext.state, lineNumberWidth,
+            frameContext.visibleLines, frameContext.scrollOffsetPx
+        )
         drawLine(
             color = scheme.gutterDivider,
             start = Offset(lineNumberWidth + gutterWidth, 0f),
@@ -497,12 +505,13 @@ internal class EditorRenderer(
         return textStats
     }
 
-    private fun frameContext(state: EditorState): EditorRenderFrameContext {
+    private fun frameContext(state: EditorState, viewport: EditorRenderViewport?): EditorRenderFrameContext {
         reusableFrameContext.prepare(
             state = state,
             textVersion = state.textBuffer.version,
             textScanCache = textScanCache,
-            bracketSnapshotCache = bracketSnapshotCache
+            bracketSnapshotCache = bracketSnapshotCache,
+            viewport = viewport
         )
         return reusableFrameContext
     }

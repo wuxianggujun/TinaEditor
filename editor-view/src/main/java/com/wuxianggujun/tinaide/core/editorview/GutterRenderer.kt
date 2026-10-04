@@ -20,7 +20,9 @@ class GutterRenderer(
     fun draw(
         drawScope: DrawScope,
         state: EditorState,
-        originX: Float
+        originX: Float,
+        visibleLines: IntRange = state.visibleLines,
+        scrollOffsetPx: Float = state.scrollOffsetPx
     ) {
         val scheme = state.colorScheme
         val widthPx = width(state)
@@ -45,14 +47,14 @@ class GutterRenderer(
             collapsedPath.close()
         }
 
-        state.visibleLines.forEach { visualLine ->
+        visibleLines.forEach { visualLine ->
             val line = state.docLineForVisualLine(visualLine)
             if (line >= state.textBuffer.lineCount) return@forEach
             if (state.isVisualLineContinuation(visualLine)) return@forEach
             val decoration = state.gutterDecorations[line] ?: return@forEach
             if (!decoration.foldable || !foldingValid) return@forEach
 
-            val centerY = state.visualLineTopInViewport(visualLine) + lineHeightPx / 2f
+            val centerY = visualLine * lineHeightPx - scrollOffsetPx + lineHeightPx / 2f
             val collapsed = state.isFoldCollapsedAtLine(line)
             val hasHiddenDiagnostic = state.hasHiddenDiagnosticsInFold(line)
             val foldColor = when {

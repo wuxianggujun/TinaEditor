@@ -31,14 +31,14 @@ internal class SelectionRenderer {
         val pos = state.cursorPosition
         val line = pos.line
         val visualLine = state.visualLineForPosition(line, pos.column)
-        if (visualLine !in state.visibleLines) return
+        if (visualLine !in frameContext.visibleLines) return
         val range = state.selectionRange
         if (range != null && !range.isEmpty) {
             val endpoints = resolveSelectionEndpoints(state, range)
             if (line in endpoints.startLine..endpoints.endLine) return
         }
-        val top = state.visualLineTopInViewport(visualLine)
-        val highlightWidth = (drawScope.size.width + state.scrollOffsetXPx - textStartX)
+        val top = frameContext.visualLineTopInViewport(visualLine)
+        val highlightWidth = (drawScope.size.width + frameContext.scrollOffsetXPx - textStartX)
             .coerceAtLeast(0f)
         drawScope.drawRect(
             color = state.colorScheme.currentLineBackground,
@@ -55,7 +55,7 @@ internal class SelectionRenderer {
         lineLayoutCache: EditorLineLayoutCache
     ) {
         val state = frameContext.state
-        val visibleVisualLines = state.visibleLines
+        val visibleVisualLines = frameContext.visibleLines
         if (visibleVisualLines.isEmpty()) return
         val textVersion = frameContext.textVersion
         val selectionBackground = state.colorScheme.selectionBackground
@@ -102,7 +102,7 @@ internal class SelectionRenderer {
                 val selectionEndAdvance = prefixLayout.textEndAdvance(safeEndColumn)
                 val x = textStartX + selectionStartAdvance - segmentStartAdvance
                 val width = (selectionEndAdvance - selectionStartAdvance).coerceAtLeast(0f)
-                val y = state.visualLineTopInViewport(visualLine)
+                val y = frameContext.visualLineTopInViewport(visualLine)
                 drawScope.drawRect(
                     color = selectionBackground,
                     topLeft = Offset(x, y),
@@ -126,7 +126,8 @@ internal class SelectionRenderer {
             textStartX = textStartX,
             textPaint = textPaint,
             lineLayoutCache = lineLayoutCache,
-            lineTextProvider = frameContext::lineText
+            lineTextProvider = frameContext::lineText,
+            scrollOffsetPx = frameContext.scrollOffsetPx
         ) ?: return
         val handleColor = state.colorScheme.selectionHandle
         val stemTopOffset = layout.drawRadiusPx * 1.45f

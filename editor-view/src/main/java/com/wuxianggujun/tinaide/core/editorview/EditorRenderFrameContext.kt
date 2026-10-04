@@ -27,6 +27,19 @@ internal class EditorRenderFrameContext private constructor(
 
     private var _state: EditorState? = null
     val state: EditorState get() = _state!!
+    private var viewport: EditorRenderViewport? = null
+    val scrollOffsetPx: Float get() = viewport?.scrollOffsetPx ?: state.scrollOffsetPx
+    val scrollOffsetXPx: Float get() = viewport?.scrollOffsetXPx ?: state.scrollOffsetXPx
+    val visibleLines: IntRange get() = viewport?.visibleLines ?: state.visibleLines
+    val visibleDocumentLines: IntRange
+        get() {
+            if (viewport == null) return state.visibleDocumentLines
+            val lines = visibleLines
+            if (lines.isEmpty()) return IntRange.EMPTY
+            return state.docLineForVisualLine(lines.first)..state.docLineForVisualLine(lines.last)
+        }
+
+    fun visualLineTopInViewport(visualLine: Int): Float = visualLine * state.lineHeightPx - scrollOffsetPx
     var textVersion: Long = 0L
         private set
     private var _textScanCache: EditorTextScanCache? = null
@@ -38,12 +51,14 @@ internal class EditorRenderFrameContext private constructor(
         state: EditorState,
         textVersion: Long,
         textScanCache: EditorTextScanCache,
-        bracketSnapshotCache: EditorBracketSnapshotCache
+        bracketSnapshotCache: EditorBracketSnapshotCache,
+        viewport: EditorRenderViewport? = null
     ) {
         this._state = state
         this.textVersion = textVersion
         this._textScanCache = textScanCache
         this._bracketSnapshotCache = bracketSnapshotCache
+        this.viewport = viewport
     }
 
     fun lineText(line: Int): String {

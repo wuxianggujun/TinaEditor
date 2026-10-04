@@ -29,7 +29,7 @@ internal class BracketPairGuideRenderer {
         ) {
             return
         }
-        val visibleLines = state.visibleDocumentLines
+        val visibleLines = frameContext.visibleDocumentLines
         if (visibleLines.isEmpty()) return
 
         val guides = frameContext.bracketSnapshotCache.resolveVisibleGuides(
@@ -89,8 +89,8 @@ internal class BracketPairGuideRenderer {
 
             val startVisualLine = state.visualLineForDocLine(guide.openLine + 1)
             val endVisualLine = state.visualLineForDocLine(guide.closeLine)
-            val topY = state.visualLineTopInViewport(startVisualLine)
-            val bottomY = state.visualLineTopInViewport(endVisualLine) + lineHeightPx
+            val topY = frameContext.visualLineTopInViewport(startVisualLine)
+            val bottomY = frameContext.visualLineTopInViewport(endVisualLine) + lineHeightPx
 
             val isActive = cursorLine in guide.openLine..guide.closeLine
             val color = when {
