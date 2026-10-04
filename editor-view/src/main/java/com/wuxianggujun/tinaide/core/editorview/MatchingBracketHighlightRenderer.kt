@@ -111,16 +111,18 @@ internal class MatchingBracketHighlightRenderer {
             textVersion = frameContext.textVersion,
             paint = textPaint,
         )
-        val visualLine = state.visualLineForDocLine(line)
-        val top = frameContext.visualLineTopInViewport(visualLine)
         val maxColumn = prefixLayout.length
         val height = state.lineHeightPx
 
         columns.forEach { column ->
             val startColumn = column.coerceIn(0, maxColumn)
             val endColumn = (column + 1).coerceIn(startColumn, maxColumn)
+            val visualLine = state.visualLineForPosition(line, startColumn)
+            if (visualLine !in frameContext.visibleLines) return@forEach
+            val top = frameContext.visualLineTopInViewport(visualLine)
+            val segmentStart = prefixLayout.segmentStartAdvance(state.visualLineStartColumn(visualLine))
             val startAdvance = prefixLayout.textStartAdvance(startColumn)
-            val left = textStartX + startAdvance
+            val left = textStartX + startAdvance - segmentStart
             val width = prefixLayout.textEndAdvance(endColumn) - startAdvance
             if (width <= 0f) return@forEach
 

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.view.KeyEvent
+import android.view.inputmethod.CorrectionInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import androidx.test.core.app.ApplicationProvider
@@ -19,16 +20,151 @@ import org.robolectric.annotation.Config
 class EditorInputConnectionEditTest {
 
     @Test
-    fun deleteSurroundingText_shouldDeleteSelectionFirst() {
+    fun deleteSurroundingText_shouldPreserveSelectionAndDeleteBothSidesAsOneUndoEntry() {
         val state = createState("abcdef")
         val connection = createConnection(state)
         state.selectRange(startOffset = 2, endOffset = 4)
 
         connection.deleteSurroundingText(beforeLength = 1, afterLength = 1)
 
+        assertThat(state.textBuffer.toString()).isEqualTo("acdf")
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(1, 3))
+        assertThat(state.cursorOffset).isEqualTo(3)
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("abcdef")
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(2, 4))
+        assertThat(state.redo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("acdf")
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(1, 3))
+    }
+
+    @Test
+    fun deleteSurroundingText_zeroLengths_shouldNotChangeSelectionOrHistory() {
+        val state = createState("abcdef")
+        val connection = createConnection(state)
+        state.selectRange(startOffset = 4, endOffset = 2)
+        val version = state.textBuffer.version
+
+        connection.deleteSurroundingText(0, 0)
+        connection.deleteSurroundingTextInCodePoints(0, 0)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("abcdef")
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(4, 2))
+        assertThat(state.textBuffer.version).isEqualTo(version)
+        assertThat(state.textBuffer.canUndo()).isFalse()
+    }
+
+    @Test
+    fun deleteSurroundingTextInCodePoints_shouldPreserveReversedSelection() {
+        val state = createState("a😀cd😀f")
+        val connection = createConnection(state)
+        state.selectRange(startOffset = 5, endOffset = 3)
+
+        connection.deleteSurroundingTextInCodePoints(1, 1)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("acdf")
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(3, 1))
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("a😀cd😀f")
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(5, 3))
+    }
+
+    @Test
+    fun deleteSurroundingText_largeLengths_shouldKeepSelectedText() {
+        val state = createState("abcdef")
+        val connection = createConnection(state)
+        state.selectRange(startOffset = 2, endOffset = 4)
+
+        connection.deleteSurroundingText(Int.MAX_VALUE, Int.MAX_VALUE)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("cd")
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(0, 2))
+    }
+
+    @Test
+    fun deleteSurroundingText_multipleSelections_shouldProtectEverySelectionAndMergeOverlaps() {
+        val state = createState("abCDefGHij")
+        val connection = createConnection(state)
+        val before = EditorSelectionSet.of(
+            primary = OffsetRange(4, 2),
+            secondary = listOf(OffsetRange(6, 8))
+        )
+        state.applySelectionSet(before, ensureVisible = false)
+
+        connection.deleteSurroundingText(3, 3)
+
+        assertThat(state.textBuffer.toString()).isEqualTo("CDGH")
+        assertThat(state.selectionSet).isEqualTo(
+            EditorSelectionSet.of(OffsetRange(2, 0), listOf(OffsetRange(2, 4)))
+        )
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("abCDefGHij")
+        assertThat(state.selectionSet).isEqualTo(before)
+    }
+
+    @Test
+    fun hardwareBackspace_shouldStillDeleteSelectedText() {
+        val state = createState("abcdef")
+        val connection = createConnection(state)
+        state.selectRange(startOffset = 2, endOffset = 4)
+
+        connection.handleKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+
         assertThat(state.textBuffer.toString()).isEqualTo("abef")
         assertThat(state.selectionRange).isNull()
-        assertThat(state.cursorOffset).isEqualTo(2)
+    }
+
+    @Test
+    fun commitCorrection_shouldNotInsertAlreadyCommittedTextOrAddUndoHistory() {
+        val state = createState("")
+        val connection = createConnection(state)
+        connection.commitText("the", 1)
+        val version = state.textBuffer.version
+
+        assertThat(connection.commitCorrection(CorrectionInfo(0, "teh", "the"))).isTrue()
+
+        assertThat(state.textBuffer.toString()).isEqualTo("the")
+        assertThat(state.textBuffer.version).isEqualTo(version)
+        assertThat(state.cursorOffset).isEqualTo(3)
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEmpty()
+    }
+
+    @Test
+    fun commitCorrection_shouldNotReplaceSelectionOrFinishComposition() {
+        val state = createState("abc")
+        val connection = createConnection(state)
+        state.selectRange(startOffset = 0, endOffset = 2)
+        connection.commitCorrection(CorrectionInfo(0, "x", "a"))
+        assertThat(state.selectionRange).isEqualTo(OffsetRange(0, 2))
+        assertThat(state.textBuffer.toString()).isEqualTo("abc")
+
+        state.moveCursorTo(3)
+        connection.setComposingText("n", 1)
+        connection.commitCorrection(CorrectionInfo(0, "x", "a"))
+        connection.setComposingText("ni", 1)
+        connection.finishComposingText()
+        assertThat(state.textBuffer.toString()).isEqualTo("abcni")
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("abc")
+    }
+
+    @Test
+    fun deleteSurroundingText_atCompositionEnd_shouldDeleteOutsideComposition() {
+        val state = createState("abcdeXYz")
+        val connection = createConnection(state)
+        state.moveCursorTo(7)
+        connection.setComposingRegion(5, 7)
+
+        connection.deleteSurroundingText(1, 1)
+        assertThat(state.textBuffer.toString()).isEqualTo("abcdXY")
+        assertThat(state.cursorOffset).isEqualTo(6)
+        connection.setComposingText("Q", 1)
+        connection.finishComposingText()
+
+        assertThat(state.textBuffer.toString()).isEqualTo("abcdQ")
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("abcdeXYz")
     }
 
     @Test

@@ -20,7 +20,8 @@ internal class EditorFocusCoordinator(
         if (!effectiveFocused && wasFocused) {
             interactionController.dismissCompletion()
             onContextMenuVisibilityChanged(false)
-            interactionController.hideKeyboardAndClearHostFocus()
+            // A Compose find field is taking over the same IME; do not hide its keyboard.
+            if (!state.find.visible) interactionController.hideKeyboardAndClearHostFocus()
         }
     }
 

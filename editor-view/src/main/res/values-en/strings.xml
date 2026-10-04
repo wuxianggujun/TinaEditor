@@ -18,4 +18,22 @@
     <string name="editor_hover_close">Close</string>
     <string name="editor_signature_previous">Previous signature</string>
     <string name="editor_signature_next">Next signature</string>
+    <string name="editor_find_query">Find</string>
+    <string name="editor_find_count">%1$d / %2$d</string>
+    <string name="editor_find_previous">Previous match</string>
+    <string name="editor_find_next">Next match</string>
+    <string name="editor_find_close">Close find</string>
+    <string name="editor_find_case">Match case</string>
+    <string name="editor_find_word">Whole word</string>
+    <string name="editor_find_regex">Regex</string>
+    <string name="editor_find_replace">Replace</string>
+    <string name="editor_find_replacement">Replace with</string>
+    <string name="editor_find_replace_all">Replace all</string>
+    <string name="editor_find_invalid_query">Invalid regular expression</string>
+    <string name="editor_find_invalid_replacement">Invalid replacement expression or capture group</string>
+    <string name="editor_cursor_above">Add cursor above</string>
+    <string name="editor_cursor_below">Add cursor below</string>
+    <string name="editor_cursor_touch_mode">Toggle tap-to-add cursors</string>
+    <string name="editor_cursor_clear">Clear extra cursors</string>
+    <string name="editor_cursor_touch_active">Tap-to-add cursors is on · Tap to exit</string>
 </resources>

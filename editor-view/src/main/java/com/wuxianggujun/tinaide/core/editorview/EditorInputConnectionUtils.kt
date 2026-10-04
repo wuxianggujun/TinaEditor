@@ -15,6 +15,57 @@ internal data class ImeDeleteRange(
         get() = start >= end
 }
 
+/** IME surrounding deletion excludes selections/composition, unlike a Backspace command. */
+internal fun planImeSurroundingDeletion(
+    textBuffer: TextBuffer,
+    selectionSet: EditorSelectionSet,
+    composingRange: ComposingRange?,
+    resolveRange: (Int) -> ImeDeleteRange?
+): EditorEditPlan {
+    val selections = selectionSet.normalized(textBuffer.length)
+    val protectedRanges = selections.selections.mapIndexed { index, selection ->
+        if (index == selections.primaryIndex && composingRange != null) {
+            OffsetRange(
+                minOf(selection.start, composingRange.start),
+                maxOf(selection.end, composingRange.end)
+            )
+        } else {
+            OffsetRange(selection.start, selection.end)
+        }
+    }
+    val protectedText = protectedRanges.filterNot { it.isEmpty }.sortedBy { it.start }
+    val deletions = mutableListOf<OffsetRange>()
+    for (protectedRange in protectedRanges) {
+        val beforeStart = resolveRange(protectedRange.start)?.start ?: protectedRange.start
+        val afterEnd = resolveRange(protectedRange.end)?.end ?: protectedRange.end
+        for (requested in listOf(
+            OffsetRange(beforeStart, protectedRange.start),
+            OffsetRange(protectedRange.end, afterEnd)
+        )) {
+            // Another cursor's surrounding range must not erase this cursor's selected text.
+            var start = requested.start
+            for (reserved in protectedText) {
+                if (reserved.end <= start) continue
+                if (reserved.start >= requested.end) break
+                if (reserved.start > start) deletions += OffsetRange(start, reserved.start)
+                start = maxOf(start, reserved.end)
+                if (start >= requested.end) break
+            }
+            if (start < requested.end) deletions += OffsetRange(start, requested.end)
+        }
+    }
+    if (deletions.isEmpty()) return EditorEditPlan(emptyList(), selections)
+
+    // Reuse the edit planner's overlap merging and the line-edit selection mapper so
+    // both sides/all cursors form one undo entry and reversed selections stay reversed.
+    val edits = EditorMultiCursorEditPlanner.replace(
+        selectionSet = EditorSelectionSet.of(deletions.first(), deletions.drop(1)),
+        replacement = "",
+        documentLength = textBuffer.length
+    ).edits
+    return EditorEditPlan(edits, mapSelectionSetThroughEdits(selections, edits))
+}
+
 internal fun extractedTextSelectionOffset(
     documentOffset: Int,
     windowStartOffset: Int,

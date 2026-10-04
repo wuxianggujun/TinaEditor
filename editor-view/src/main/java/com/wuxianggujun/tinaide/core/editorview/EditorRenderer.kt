@@ -1,6 +1,7 @@
 package com.wuxianggujun.tinaide.core.editorview
 
 import android.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.withTransform
 import android.graphics.Typeface
 import android.os.SystemClock
 import androidx.compose.ui.geometry.Offset
@@ -460,6 +461,13 @@ internal class EditorRenderer(
             textPaint = textPaint,
             lineLayoutCache = lineLayoutCache
         )
+        val extensions = frameContext.state.renderExtensions
+        val extraContext = if (frameContext.state.find.visible || extensions.isNotEmpty())
+            EditorRenderContext(frameContext, textStartX, textPaint, lineLayoutCache) else null
+        if (extraContext != null) {
+            FindMatchHighlightRenderer.draw(drawScope, extraContext, frameContext.state.find)
+            drawExtensions(drawScope, extraContext, extensions, EditorRenderLayer.Background)
+        }
         val textStats = textRenderer.drawText(
             drawScope = drawScope,
             frameContext = frameContext,
@@ -495,6 +503,9 @@ internal class EditorRenderer(
             textPaint = textPaint,
             lineLayoutCache = lineLayoutCache
         )
+        if (extraContext != null) {
+            drawExtensions(drawScope, extraContext, extensions, EditorRenderLayer.Foreground)
+        }
         selectionRenderer.drawSelectionHandles(
             drawScope = drawScope,
             frameContext = frameContext,
@@ -503,6 +514,22 @@ internal class EditorRenderer(
             lineLayoutCache = lineLayoutCache
         )
         return textStats
+    }
+
+    private fun drawExtensions(
+        scope: DrawScope,
+        context: EditorRenderContext,
+        extensions: List<EditorRenderExtension>,
+        layer: EditorRenderLayer
+    ) {
+        extensions.filter { it.layer == layer }.forEach { extension ->
+            with(scope) {
+                // Isolate custom canvas transformations from subsequent editor layers.
+                withTransform({}) {
+                    extension.renderer.draw(this, context)
+                }
+            }
+        }
     }
 
     private fun frameContext(state: EditorState, viewport: EditorRenderViewport?): EditorRenderFrameContext {

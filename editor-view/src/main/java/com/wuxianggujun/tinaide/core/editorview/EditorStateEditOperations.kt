@@ -780,33 +780,14 @@ internal fun editorReplaceAll(
     caseSensitive: Boolean,
     useRegex: Boolean
 ): Int {
-    if (findText.isEmpty()) return 0
-
-    val original = state.textBuffer.substring(0, state.textBuffer.length)
-    val replacedResult = replaceTextByOptions(
-        original = original,
-        findText = findText,
-        replaceText = replaceText,
-        caseSensitive = caseSensitive,
-        useRegex = useRegex
-    ) ?: return 0
-    val (replaced, count) = replacedResult
-    if (replaced == original) return 0
-
-    state.cancelSnippet()
-
-    state.textBuffer.editTransaction(
-        cursorBefore = state.cursorOffset,
-        cursorAfter = { state.cursorOffset },
-        selectionBefore = state.selectionRange.toTextSelectionSnapshot(),
-        selectionAfter = { state.selectionRange.toTextSelectionSnapshot() }
-    ) {
-        state.textBuffer.replace(0, state.textBuffer.length, replaced)
-        state.moveCursorTo(0)
-    }
-    state.emitTextChanged(reason = "replaceAll")
-    state.scrollToLine(0)
-    return count
+    val found = EditorFindEngine.scan(
+        state.textBuffer.substring(0, state.textBuffer.length), findText,
+        EditorFindOptions(caseSensitive = caseSensitive, regex = useRegex), replaceText
+    )
+    if (found.error != null || found.edits.isEmpty()) return 0
+    applyMultiCursorEditPlan(state, EditorEditPlan(found.edits,
+        mapSelectionSetThroughEdits(state.selectionSet, found.edits)), "replaceAll")
+    return found.edits.size
 }
 
 internal fun editorToggleLineComment(
@@ -1128,40 +1109,4 @@ private fun restoreUndoRedoSelection(
     if (oldSelection != restored) {
         state.emitEvent(EditorEvent.SelectionChanged(restored))
     }
-}
-
-private fun replaceTextByOptions(
-    original: String,
-    findText: String,
-    replaceText: String,
-    caseSensitive: Boolean,
-    useRegex: Boolean
-): Pair<String, Int>? {
-    if (useRegex) {
-        val regex = runCatching {
-            if (caseSensitive) Regex(findText) else Regex(findText, RegexOption.IGNORE_CASE)
-        }.getOrNull() ?: return null
-
-        val count = regex.findAll(original).count()
-        if (count <= 0) return null
-        return regex.replace(original, replaceText) to count
-    }
-
-    val count = countOccurrences(original, findText, ignoreCase = !caseSensitive)
-    if (count <= 0) return null
-    val replaced = original.replace(findText, replaceText, ignoreCase = !caseSensitive)
-    return replaced to count
-}
-
-private fun countOccurrences(text: String, target: String, ignoreCase: Boolean): Int {
-    if (target.isEmpty()) return 0
-    var count = 0
-    var start = 0
-    while (true) {
-        val index = text.indexOf(target, start, ignoreCase)
-        if (index < 0) break
-        count++
-        start = index + target.length
-    }
-    return count
 }

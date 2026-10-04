@@ -45,7 +45,7 @@ internal fun editorDeleteSurroundingMultipleSelections(
     return applyMultiCursorEditPlan(state, plan, reason)
 }
 
-private fun applyMultiCursorEditPlan(
+internal fun applyMultiCursorEditPlan(
     state: EditorState,
     plan: EditorEditPlan,
     reason: String

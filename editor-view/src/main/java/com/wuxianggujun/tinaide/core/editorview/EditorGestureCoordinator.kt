@@ -39,7 +39,7 @@ internal class EditorGestureCoordinator(
         }
     }
 
-    fun onTap(position: Offset, isCtrlPressed: Boolean = false) {
+    fun onTap(position: Offset, isCtrlPressed: Boolean = false, isAltPressed: Boolean = false) {
         if (shouldBlockBasicGestures()) return
         onContextMenuVisibleChange(false)
         syncPaintForHitTest()
@@ -56,6 +56,13 @@ internal class EditorGestureCoordinator(
         when {
             gutterX < zones.lineNumberEndX -> {
                 gestureHandler.clearTextTapTracking()
+                if (state.multiCursorTapMode || isAltPressed) {
+                    val column = state.cursorPosition.column.coerceAtMost(state.textBuffer.getLine(line).length)
+                    state.toggleCursorAt(state.textBuffer.positionToOffset(line, column))
+                    interactionController.requestEditorFocus()
+                    interactionController.syncSelectionToIme()
+                    return
+                }
                 state.onLineNumberTap?.invoke(line)
                 return
             }
@@ -97,6 +104,14 @@ internal class EditorGestureCoordinator(
             textStartX = zones.textStartX
         )
         val offset = state.textBuffer.positionToOffset(line, column)
+        if (isAltPressed || state.multiCursorTapMode) {
+            gestureHandler.clearTextTapTracking()
+            interactionController.prepareForExternalEdit()
+            state.toggleCursorAt(offset)
+            interactionController.requestEditorFocus()
+            interactionController.syncSelectionToIme()
+            return
+        }
         if (isCtrlPressed && state.onRequestGotoDefinition != null && state.hasWordAt(line, column)) {
             gestureHandler.clearTextTapTracking()
             state.moveCursorTo(offset)
@@ -116,6 +131,33 @@ internal class EditorGestureCoordinator(
             state.moveCursorTo(offset)
         }
         interactionController.requestEditorFocusAndKeyboard()
+        interactionController.syncSelectionToIme()
+    }
+
+    fun canStartRectangle(position: Offset): Boolean {
+        syncPaintForHitTest()
+        val contentX = position.x + if (state.pinLineNumber) 0f else state.scrollOffsetXPx
+        return !shouldBlockBasicGestures() && contentX >= renderer.contentStartX(state, lineNumberPaint)
+    }
+
+    fun onRectangleSelection(anchor: Offset, caret: Offset) {
+        syncPaintForHitTest()
+        val textStartX = renderer.contentStartX(state, lineNumberPaint)
+        val anchorRow = state.visualLineFromViewportY(anchor.y)
+        val caretRow = state.visualLineFromViewportY(caret.y)
+        val ranges = (minOf(anchorRow, caretRow)..maxOf(anchorRow, caretRow)).map { row ->
+            val line = state.docLineForVisualLine(row)
+            OffsetRange(
+                resolveOffsetFromViewportX(row, line, anchor.x, textStartX),
+                resolveOffsetFromViewportX(row, line, caret.x, textStartX)
+            )
+        }
+        if (ranges.isEmpty()) return
+        val primary = if (caretRow >= anchorRow) ranges.last() else ranges.first()
+        interactionController.prepareForExternalEdit()
+        state.applySelectionSet(EditorSelectionSet.of(primary, ranges.filterNot { it === primary }), ensureVisible = false)
+        onContextMenuVisibleChange(false)
+        interactionController.requestEditorFocus()
         interactionController.syncSelectionToIme()
     }
 

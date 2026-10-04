@@ -91,7 +91,22 @@ internal fun handleEditorShortcut(
         return true
     }
 
-    if (event.key == Key.Escape && state.hasMultipleSelections) {
+    if (event.isCtrlPressed && (event.key == Key.F || event.key == Key.H)) {
+        onBeforeTextEdit()
+        state.find.show(replace = event.key == Key.H)
+        return true
+    }
+    if (event.key == Key.F3) {
+        if (event.isShiftPressed) state.find.previous() else state.find.next()
+        onAfterTextEdit()
+        return true
+    }
+    if (event.key == Key.Escape && state.find.visible) {
+        state.find.dismiss()
+        return true
+    }
+    if (event.key == Key.Escape && (state.hasMultipleSelections || state.multiCursorTapMode)) {
+        state.multiCursorTapMode = false
         state.clearSecondaryCursors()
         return true
     }

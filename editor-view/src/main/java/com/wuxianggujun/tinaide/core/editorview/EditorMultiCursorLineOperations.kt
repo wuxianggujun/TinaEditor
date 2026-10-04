@@ -298,7 +298,7 @@ private fun resolveSelectionLineRange(
     return startLine to endLine.coerceIn(startLine, lastLine)
 }
 
-private fun mapSelectionSetThroughEdits(
+internal fun mapSelectionSetThroughEdits(
     selectionSet: EditorSelectionSet,
     edits: List<EditorTextEdit>
 ): EditorSelectionSet = rebuildSelectionSet(
@@ -357,7 +357,7 @@ private fun rebuildSelectionSet(
     return EditorSelectionSet.of(primary = primary, secondary = secondary)
 }
 
-private fun mapOffsetThroughEdits(
+internal fun mapOffsetThroughEdits(
     offset: Int,
     edits: List<EditorTextEdit>
 ): Int {

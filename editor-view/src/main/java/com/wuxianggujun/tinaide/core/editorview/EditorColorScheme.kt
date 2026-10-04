@@ -50,7 +50,9 @@ data class EditorColorScheme(
     val bracketPairGuide: Color = Color(0x33808080),
     val bracketPairGuideActive: Color = Color(0x66808080),
     val whitespace: Color = Color(0x40808080),
-    val syntax: EditorSyntaxColors
+    val syntax: EditorSyntaxColors,
+    val findMatchBackground: Color = Color(0x557DAA20),
+    val findMatchActiveBackground: Color = Color(0x99D99A20)
 ) {
     companion object {
         private val DEFAULT_RAINBOW_BRACKET_COLORS = listOf(

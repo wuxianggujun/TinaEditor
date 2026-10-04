@@ -15,8 +15,21 @@ internal enum class EditorContextMenuActionId {
     CodeActions,
     RenameSymbol,
     SwitchHeaderSource,
-    Hover
+    Hover,
+    Find,
+    AddCursorAbove,
+    AddCursorBelow,
+    ToggleCursorTapMode,
+    ClearExtraCursors
 }
+
+internal val editorLocalMenuLabels = linkedMapOf(
+    EditorContextMenuActionId.Find to R.string.editor_find_query,
+    EditorContextMenuActionId.AddCursorAbove to R.string.editor_cursor_above,
+    EditorContextMenuActionId.AddCursorBelow to R.string.editor_cursor_below,
+    EditorContextMenuActionId.ToggleCursorTapMode to R.string.editor_cursor_touch_mode,
+    EditorContextMenuActionId.ClearExtraCursors to R.string.editor_cursor_clear
+)
 
 internal class EditorSelectionContextMenuCoordinator(
     private val state: EditorState,
@@ -45,6 +58,7 @@ internal class EditorSelectionContextMenuCoordinator(
         if (state.onRequestRenameSymbol != null) add(EditorContextMenuActionId.RenameSymbol)
         if (state.onRequestSwitchHeaderSource != null) add(EditorContextMenuActionId.SwitchHeaderSource)
         if (state.onRequestHover != null) add(EditorContextMenuActionId.Hover)
+        addAll(editorLocalMenuLabels.keys)
     }
 
     fun performKeyboardAction(
@@ -66,6 +80,22 @@ internal class EditorSelectionContextMenuCoordinator(
             EditorContextMenuActionId.RenameSymbol -> onRequestRenameSymbol()
             EditorContextMenuActionId.SwitchHeaderSource -> onSwitchHeaderSource()
             EditorContextMenuActionId.Hover -> onHover(anchorInViewportPx)
+            else -> {
+                interactionController.prepareForExternalEdit()
+                when (action) {
+                    EditorContextMenuActionId.Find -> state.find.show()
+                    EditorContextMenuActionId.AddCursorAbove -> state.addCursorVertically(-1)
+                    EditorContextMenuActionId.AddCursorBelow -> state.addCursorVertically(1)
+                    EditorContextMenuActionId.ToggleCursorTapMode -> state.multiCursorTapMode = !state.multiCursorTapMode
+                    EditorContextMenuActionId.ClearExtraCursors -> {
+                        state.multiCursorTapMode = false
+                        state.clearSecondaryCursors()
+                    }
+                    else -> Unit
+                }
+                interactionController.syncSelectionToIme()
+                onDismiss()
+            }
         }
         return true
     }

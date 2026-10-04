@@ -3,7 +3,11 @@ package com.wuxianggujun.tinaide.core.editorview
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberUpdatedState
@@ -93,8 +97,25 @@ internal fun TinaEditorScaffold(
         selectionMagnifier = session.selectionMagnifier
     )
 
+    EditorFindEffect(state)
+    Column(modifier.fillMaxSize()) {
+        if (state.multiCursorTapMode) {
+            TextButton(onClick = { state.multiCursorTapMode = false }) {
+                Text(stringResource(R.string.editor_cursor_touch_active))
+            }
+        }
+        EditorFindBar(state,
+            beforeEdit = {
+                interactionController.prepareForExternalEdit()
+                interactionController.inputHostView?.clearFocus()
+            },
+            afterAction = { interactionController.syncSelectionToIme() },
+            onDismiss = {
+                state.find.dismiss()
+                interactionController.requestEditorFocusAndKeyboard()
+            })
     Box(
-        modifier = modifier
+        modifier = Modifier.weight(1f)
             .fillMaxSize()
             .focusRequester(session.focusRequester)
             .focusable()
@@ -117,6 +138,7 @@ internal fun TinaEditorScaffold(
         )
 
         EditorCanvasLayer(session)
+    }
     }
 
     EditorSelectionContextMenuOverlay(session)

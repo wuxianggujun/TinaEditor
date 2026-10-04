@@ -63,12 +63,61 @@ class MatchingBracketHighlightRendererTest {
         assertThat(rects[1].top).isGreaterThan(rects[0].top)
     }
 
-    private fun createEnv(text: String): TestEnv {
+    @Test
+    fun wrappedBrackets_shouldUseEachCharactersVisualRowAndSegmentAdvance() {
+        val text = "a".repeat(30) + "(" + "b".repeat(29) + ")"
+        val env = createEnv(text, wordWrap = true)
+        val state = env.frameContext.state
+        val rects = MatchingBracketHighlightRenderer().resolveHighlightRects(
+            env.frameContext,
+            EditorBracketSnapshotCache.BracketMatch(0, 30, 0, 60, 0),
+            env.textStartX,
+            env.textPaint,
+            env.lineLayoutCache
+        )
+        val layout = env.lineLayoutCache.getPrefixLayout(
+            state = state, line = 0, lineText = text,
+            textVersion = state.textBuffer.version, paint = env.textPaint
+        )
+
+        assertThat(rects).hasSize(2)
+        assertThat(rects[1].top).isGreaterThan(rects[0].top)
+        listOf(30, 60).forEachIndexed { index, column ->
+            val visualLine = state.visualLineForPosition(0, column)
+            assertThat(visualLine).isGreaterThan(0)
+            assertThat(rects[index].top).isEqualTo(state.visualLineTopInViewport(visualLine))
+            val expectedLeft = env.textStartX + layout.textStartAdvance(column) -
+                layout.segmentStartAdvance(state.visualLineStartColumn(visualLine))
+            assertThat(rects[index].left).isWithin(0.001f).of(expectedLeft)
+        }
+        assertThat(env.lineTextCalls[0]).isEqualTo(1)
+    }
+
+    @Test
+    fun wrappedBrackets_shouldSkipOffscreenSegmentButKeepVisibleCounterpart() {
+        val env = createEnv("a".repeat(30) + "(" + "b".repeat(29) + ")", wordWrap = true)
+        val state = env.frameContext.state
+        state.updateMetrics(20f, 10f, 20f, 240f, 24f)
+        val closeVisualLine = state.visualLineForPosition(0, 60)
+        state.scrollOffsetPx = closeVisualLine * state.lineHeightPx
+
+        val rects = MatchingBracketHighlightRenderer().resolveHighlightRects(
+            env.frameContext,
+            EditorBracketSnapshotCache.BracketMatch(0, 30, 0, 60, 0),
+            env.textStartX, env.textPaint, env.lineLayoutCache
+        )
+
+        assertThat(rects).hasSize(1)
+        assertThat(rects.single().top).isEqualTo(0f)
+    }
+
+    private fun createEnv(text: String, wordWrap: Boolean = false): TestEnv {
         val buffer = RopeTextBuffer().apply { insert(0, text) }
         val state = EditorState(
             textBuffer = buffer,
             config = EditorConfig(
                 codeFolding = false,
+                wordWrap = wordWrap,
                 tabSize = 4
             )
         ).apply {

@@ -189,6 +189,8 @@ internal fun EditorSelectionContextMenuOverlay(
         onHover = {
             coordinator.onHover(ui.contextMenuOffset)
         },
+        editorActions = editorLocalMenuLabels.keys.toList(),
+        onEditorAction = { coordinator.performKeyboardAction(it, ui.contextMenuOffset) },
         onDismiss = {
             ui.contextMenuKeyboardAction = null
             coordinator.onDismiss()

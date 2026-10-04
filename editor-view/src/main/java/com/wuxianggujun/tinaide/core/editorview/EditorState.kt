@@ -56,6 +56,10 @@ class EditorState(
         }
     var typeface by mutableStateOf<Typeface>(Typeface.MONOSPACE)
     var colorScheme by mutableStateOf(EditorColorScheme.builtinGray())
+    val find = EditorFindController(this)
+    var renderExtensions by mutableStateOf<List<EditorRenderExtension>>(emptyList())
+    /** Explicit touch mode; ordinary gutter taps keep their host breakpoint action. */
+    var multiCursorTapMode by mutableStateOf(false)
     private val documentState = EditorDocumentState(textBuffer.version)
     private val viewportState = EditorViewportState()
 
@@ -465,6 +469,7 @@ class EditorState(
         private set
     var inlayHintsByLine by mutableStateOf<Map<Int, List<EditorInlayHint>>>(emptyMap())
         private set
+    // Displayed anchor version: unchanged lines may retain locally rebased hints until LSP refreshes them.
     var inlayHintsDocumentVersion by mutableStateOf(-1L)
         private set
     var diagnostics by mutableStateOf<List<EditorDiagnostic>>(emptyList())
@@ -617,6 +622,45 @@ class EditorState(
         inlayHintsByLine = emptyMap()
         inlayHintsDocumentVersion = -1L
         inlayHintsVersion++
+    }
+
+    private fun applyTextChangeToInlayHints(change: TextChange) {
+        val previousVersion = inlayHintsDocumentVersion
+        if (previousVersion < 0L) return
+        // A transaction can dispatch several changes after the buffer has reached its final
+        // version. Advance anchors with each event, not directly to textBuffer.version.
+        val changeVersion = change.documentVersion.takeIf { it > 0L } ?: textBuffer.version
+        if (changeVersion <= previousVersion) return
+        if (changeVersion != previousVersion + 1L) {
+            // Missing an edit means the retained coordinates can no longer be trusted.
+            clearInlayHints()
+            return
+        }
+
+        val startLine = change.startLine.coerceAtLeast(0)
+        val endLine = change.endLine.coerceAtLeast(startLine)
+        // Publication and rebasing keep this list ordered by line. Typing below all hints
+        // should advance only their anchor version, without copying maps or invalidating layout.
+        if (inlayHints.lastOrNull()?.line?.let { it >= startLine } == true) {
+            val updatedByLine = LinkedHashMap<Int, List<EditorInlayHint>>(inlayHintsByLine.size)
+            for ((line, hints) in inlayHintsByLine) {
+                // Conservatively discard the edited lines: their labels/columns may be invalid.
+                if (line in startLine..endLine) continue
+                val targetLine = if (line > endLine) line + change.lineDelta else line
+                if (targetLine < 0) continue
+                updatedByLine[targetLine] = if (targetLine == line) {
+                    hints
+                } else {
+                    hints.map { hint -> hint.copy(line = targetLine) }
+                }
+            }
+            if (updatedByLine != inlayHintsByLine) {
+                inlayHintsByLine = updatedByLine
+                inlayHints = updatedByLine.values.flatten()
+                inlayHintsVersion++
+            }
+        }
+        inlayHintsDocumentVersion = changeVersion
     }
 
     private fun activeInlayHintsForLine(line: Int): List<EditorInlayHint> =
@@ -943,6 +987,8 @@ class EditorState(
 
     fun maxVerticalScrollOffsetPx(): Float = maxScrollPx()
 
+    internal fun maxVerticalScrollOffsetPx(viewportHeightPx: Float): Float = maxScrollPx(viewportHeightPx)
+
     fun maxHorizontalScrollOffsetPx(): Float = maxScrollXPx()
 
     fun scrollToLine(line: Int) {
@@ -1018,6 +1064,43 @@ class EditorState(
         )
         applySelectionSet(next, ensureVisible = false)
         return true
+    }
+
+    fun addCursorAt(line: Int, column: Int): Boolean = addCursorAt(cursorOffsetAt(line, column))
+
+    fun removeCursorAt(line: Int, column: Int): Boolean = removeCursorAt(cursorOffsetAt(line, column))
+
+    fun removeCursorAt(offset: Int): Boolean {
+        val current = selectionSet
+        if (current.selections.size < 2) return false
+        val remaining = current.selections.filterNot { it.caret == offset }
+        if (remaining.isEmpty() || remaining.size == current.selections.size) return false
+        val primary = current.primary.takeIf { it in remaining } ?: remaining.first()
+        applySelectionSet(EditorSelectionSet.of(primary, remaining.filterNot { it == primary }), ensureVisible = false)
+        return true
+    }
+
+    fun toggleCursorAt(offset: Int): Boolean {
+        val safe = snapOffsetToEditorUnitBoundary(textBuffer, offset, preferAfter = true)
+        return if (selectionSet.selections.any { it.caret == safe }) removeCursorAt(safe) else addCursorAt(safe)
+    }
+
+    /** Logical UTF-16 columns; mouse rectangles instead use measured visual-row coordinates. */
+    fun selectRectangle(anchor: Position, caret: Position) {
+        val first = minOf(anchor.line, caret.line).coerceIn(0, textBuffer.lineCount - 1)
+        val last = maxOf(anchor.line, caret.line).coerceIn(first, textBuffer.lineCount - 1)
+        val ranges = (first..last).map { line ->
+            OffsetRange(cursorOffsetAt(line, anchor.column), cursorOffsetAt(line, caret.column))
+        }
+        val primaryIndex = (caret.line - first).coerceIn(ranges.indices)
+        applySelectionSet(EditorSelectionSet.of(ranges[primaryIndex], ranges.filterIndexed { index, _ -> index != primaryIndex }),
+            ensureVisible = true)
+    }
+
+    private fun cursorOffsetAt(line: Int, column: Int): Int {
+        val safeLine = line.coerceIn(0, textBuffer.lineCount - 1)
+        val offset = textBuffer.positionToOffset(safeLine, column.coerceIn(0, textBuffer.getLine(safeLine).length))
+        return snapOffsetToEditorUnitBoundary(textBuffer, offset, preferAfter = true)
     }
 
     /** Add a cursor on the nearest available line in the requested vertical direction. */
@@ -1664,7 +1747,7 @@ class EditorState(
     private var cachedMaxScrollPxVisualLineCount = -1
     private var cachedMaxScrollPxValue = 0f
 
-    private fun maxScrollPx(): Float {
+    private fun maxScrollPx(viewportHeightPx: Float = this.viewportHeightPx): Float {
         val version = textBuffer.version
         val lh = lineHeightPx
         val vh = viewportHeightPx
@@ -1913,7 +1996,7 @@ class EditorState(
     fun applyTextBufferChange(change: TextChange) {
         val currentVersion = textBuffer.version
         textVersion = currentVersion
-        clearInlayHints()
+        applyTextChangeToInlayHints(change)
         applyTextChangeToSemanticTokens(change)
         foldingManager.adjustFoldRegionsAfterTextChange(change, currentVersion)
         applyWidthSnapshotChange(change, currentVersion)

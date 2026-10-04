@@ -18,4 +18,22 @@
     <string name="editor_hover_close">关闭</string>
     <string name="editor_signature_previous">上一条签名</string>
     <string name="editor_signature_next">下一条签名</string>
+    <string name="editor_find_query">查找</string>
+    <string name="editor_find_count">%1$d / %2$d</string>
+    <string name="editor_find_previous">上一个匹配</string>
+    <string name="editor_find_next">下一个匹配</string>
+    <string name="editor_find_close">关闭查找</string>
+    <string name="editor_find_case">区分大小写</string>
+    <string name="editor_find_word">全词</string>
+    <string name="editor_find_regex">正则</string>
+    <string name="editor_find_replace">替换</string>
+    <string name="editor_find_replacement">替换为</string>
+    <string name="editor_find_replace_all">全部替换</string>
+    <string name="editor_find_invalid_query">正则表达式无效</string>
+    <string name="editor_find_invalid_replacement">替换表达式或捕获组无效</string>
+    <string name="editor_cursor_above">在上一行添加光标</string>
+    <string name="editor_cursor_below">在下一行添加光标</string>
+    <string name="editor_cursor_touch_mode">切换点按多光标模式</string>
+    <string name="editor_cursor_clear">清除额外光标</string>
+    <string name="editor_cursor_touch_active">点按多光标模式已开启 · 点击退出</string>
 </resources>

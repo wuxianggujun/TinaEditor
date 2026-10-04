@@ -3,6 +3,7 @@ package com.wuxianggujun.tinaide.core.editorview
 import android.graphics.Paint
 import android.graphics.Typeface
 import com.google.common.truth.Truth.assertThat
+import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -14,6 +15,34 @@ class EditorInlayHintLayoutTest {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.MONOSPACE
         textSize = 20f
+    }
+
+    @Test
+    fun bottomEdit_shouldKeepTopHintWidthWrapRowsAndPrefixCache() {
+        val buffer = RopeTextBuffer("call(1)\nbottom")
+        val state = EditorState(buffer, config = EditorConfig(wordWrap = true))
+        state.updateMetrics(24f, 10f, 240f, 100f, 0f)
+        val hint = EditorInlayHint(0, 5, "parameter:")
+        state.replaceInlayHintsInLines(0..0, listOf(hint), buffer.version)
+        val cache = EditorLineLayoutCache()
+        val topLayout = cache.getPrefixLayout(state, 0, buffer.getLine(0), buffer.version, paint)
+        val secondLineVisualRow = state.visualLineForDocLine(1)
+        assertThat(secondLineVisualRow).isGreaterThan(1)
+        assertThat(topLayout.inlayHintPlacements).hasSize(1)
+        buffer.addChangeListener { change ->
+            state.applyTextBufferChange(change)
+            cache.applyTextChange(change, change.documentVersion)
+        }
+
+        buffer.insert(buffer.length, "x")
+
+        val afterEdit = cache.getPrefixLayout(state, 0, buffer.getLine(0), buffer.version, paint)
+        assertThat(afterEdit).isSameInstanceAs(topLayout)
+        assertThat(afterEdit.inlayHintPlacements).hasSize(1)
+        assertThat(state.visualLineForDocLine(1)).isEqualTo(secondLineVisualRow)
+        state.replaceInlayHintsInLines(0..1, listOf(hint), buffer.version)
+        assertThat(cache.getPrefixLayout(state, 0, buffer.getLine(0), buffer.version, paint))
+            .isSameInstanceAs(topLayout)
     }
 
     @Test

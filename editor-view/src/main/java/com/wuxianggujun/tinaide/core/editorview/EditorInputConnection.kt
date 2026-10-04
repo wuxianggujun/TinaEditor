@@ -330,24 +330,24 @@ internal class EditorInputConnection(
     }
 
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingText") { cursorOffset ->
+        return deleteImeSurroundingText(reason = "deleteSurroundingText") { cursorOffset ->
             imeDeleteSurroundingCharRange(
                 cursorOffset = cursorOffset,
                 beforeLength = beforeLength,
                 afterLength = afterLength,
                 documentLength = state.textBuffer.length
-            )?.expandToEditorUnitBoundaries(state.textBuffer)?.let { it.start to it.end }
+            )?.expandToEditorUnitBoundaries(state.textBuffer)
         }
     }
 
     override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
-        return deleteSelectionOrSurroundingText(reason = "deleteSurroundingTextInCodePoints") { cursorOffset ->
+        return deleteImeSurroundingText(reason = "deleteSurroundingTextInCodePoints") { cursorOffset ->
             imeDeleteSurroundingCodePointRange(
                 textBuffer = state.textBuffer,
                 cursorOffset = cursorOffset,
                 beforeLength = beforeLength,
                 afterLength = afterLength
-            )?.expandToEditorUnitBoundaries(state.textBuffer)?.let { it.start to it.end }
+            )?.expandToEditorUnitBoundaries(state.textBuffer)
         }
     }
 
@@ -729,14 +729,9 @@ internal class EditorInputConnection(
     }
 
     override fun commitCorrection(correctionInfo: CorrectionInfo?): Boolean {
-        val correctionText = correctionInfo?.newText?.toString() ?: return false
-        replaceCurrentImeEditRange(
-            replacement = correctionText,
-            newCursorPosition = 1,
-            keepComposing = false,
-            insertedCallback = onInsertedText
-        )
-        return true
+        // The IME has already committed the corrected text. This is a notification,
+        // not another replacement request (AOSP only highlights the corrected word).
+        return correctionInfo != null && !closed.get()
     }
 
     override fun performEditorAction(editorAction: Int): Boolean {
@@ -864,40 +859,39 @@ internal class EditorInputConnection(
         }
     }
 
-    private fun deleteSelectionOrSurroundingText(
+    private fun deleteImeSurroundingText(
         reason: String,
-        surroundingRange: (Int) -> Pair<Int, Int>?
+        surroundingRange: (Int) -> ImeDeleteRange?
     ): Boolean {
+        if (closed.get()) return false
         ensureComposingSessionValid()
-        if (state.hasMultipleSelections) {
-            val changed = editorDeleteSurroundingMultipleSelections(
-                state = state,
-                reason = reason,
-                resolveRange = surroundingRange
-            )
-            if (changed) onNonInsertEdit()
+        if (!state.hasMultipleSelections && state.selectionRange == null && composingRange == null) {
+            // Keep ordinary typing/deletion on the allocation-light, snippet-aware path.
+            val range = surroundingRange(cursorOffset()) ?: return true
+            if (state.replaceRange(range.start, range.end, "")) {
+                onNonInsertEdit()
+                logIme("$reason deleteRange=(${range.start},${range.end})")
+            }
             return true
         }
-
-        val selectedRange = state.selectionRange
-            ?.takeUnless { it.isEmpty }
-            ?.let { ImeDeleteRange(start = it.start, end = it.end) }
-            ?.expandToEditorUnitBoundaries(state.textBuffer)
-        val deleteRange = selectedRange ?: surroundingRange(cursorOffset())
-            ?.let { ImeDeleteRange(start = it.first, end = it.second) }
-            ?.expandToEditorUnitBoundaries(state.textBuffer)
-            ?: return true
-        if (deleteRange.isEmpty) return true
-
-        val changed = state.replaceRange(
-            startOffset = deleteRange.start,
-            endOffset = deleteRange.end,
-            replacement = ""
+        val plan = planImeSurroundingDeletion(
+            textBuffer = state.textBuffer,
+            selectionSet = state.selectionSet,
+            composingRange = composingRange,
+            resolveRange = surroundingRange
         )
+        if (plan.isEmpty) return true
+        val previousComposing = composingRange
+        val changed = applyMultiCursorEditPlan(state, plan, reason)
         if (changed) {
-            updateComposingRangeAfterDeletion(deleteRange.start, deleteRange.end)
+            composingRange = previousComposing?.let {
+                ComposingRange(
+                    start = mapOffsetThroughEdits(it.start, plan.edits),
+                    end = mapOffsetThroughEdits(it.end, plan.edits)
+                )
+            }
             onNonInsertEdit()
-            logIme("$reason deleteRange=(${deleteRange.start},${deleteRange.end})")
+            logIme("$reason editCount=${plan.edits.size}")
         }
         return true
     }
@@ -949,22 +943,6 @@ internal class EditorInputConnection(
             insertedCallback(resolved.replacement)
         } else {
             onNonInsertEdit()
-        }
-    }
-
-    private fun updateComposingRangeAfterDeletion(editStart: Int, editEnd: Int) {
-        val composing = composingRange ?: return
-        when {
-            editEnd <= composing.start -> {
-                val removedLength = (editEnd - editStart).coerceAtLeast(0)
-                composingRange = ComposingRange(
-                    start = composing.start - removedLength,
-                    end = composing.end - removedLength
-                )
-            }
-
-            editStart >= composing.end -> Unit
-            else -> finishComposingSession()
         }
     }
 

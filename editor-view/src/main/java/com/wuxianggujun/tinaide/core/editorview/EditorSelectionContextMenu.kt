@@ -94,7 +94,9 @@ internal fun EditorSelectionContextMenu(
     onRenameSymbol: () -> Unit,
     onSwitchHeaderSource: () -> Unit,
     onHover: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    editorActions: List<EditorContextMenuActionId> = emptyList(),
+    onEditorAction: (EditorContextMenuActionId) -> Unit = {}
 ) {
     if (!visible) return
 
@@ -127,6 +129,7 @@ internal fun EditorSelectionContextMenu(
             EditorContextMenuActionId.Paste -> moreMenuExpanded = false
 
             null -> Unit
+            else -> moreMenuExpanded = true
         }
     }
 
@@ -203,7 +206,9 @@ internal fun EditorSelectionContextMenu(
                     onCodeActions = onCodeActions,
                     onRenameSymbol = onRenameSymbol,
                     onSwitchHeaderSource = onSwitchHeaderSource,
-                    onHover = onHover
+                    onHover = onHover,
+                    editorActions = editorActions,
+                    onEditorAction = onEditorAction
                 )
             }
         }
@@ -279,7 +284,9 @@ private fun EditorContextMenuMoreAction(
     onCodeActions: () -> Unit,
     onRenameSymbol: () -> Unit,
     onSwitchHeaderSource: () -> Unit,
-    onHover: () -> Unit
+    onHover: () -> Unit,
+    editorActions: List<EditorContextMenuActionId>,
+    onEditorAction: (EditorContextMenuActionId) -> Unit
 ) {
     val moreTitle = stringResource(R.string.editor_context_menu_more)
     val runOverflowAction: (() -> Unit) -> Unit = { action ->
@@ -321,6 +328,15 @@ private fun EditorContextMenuMoreAction(
             shadowElevation = editorPopupElevation,
             border = BorderStroke(editorPopupBorderWidth, popupColors.borderColor)
         ) {
+            editorActions.forEach { action ->
+                EditorContextMenuOverflowAction(
+                    title = stringResource(editorLocalMenuLabels.getValue(action)),
+                    tag = "editor_selection_context_menu_action_${action.name}",
+                    keyboardSelected = keyboardSelectedAction == action,
+                    popupColors = popupColors,
+                    onClick = { runOverflowAction { onEditorAction(action) } }
+                )
+            }
             EditorContextMenuOverflowAction(
                 title = stringResource(R.string.editor_context_menu_select_all),
                 icon = Icons.Default.SelectAll,

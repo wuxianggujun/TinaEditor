@@ -74,6 +74,39 @@ class EditorRenderViewportTest {
         assertThat(viewport.visibleLines).isEqualTo(0..1)
     }
 
+    @Test
+    fun zoomAtDocumentEnd_shouldClampToPreviewBottomPaddingWithoutChangingState() {
+        val state = state().apply { scrollOffsetPx = maxVerticalScrollOffsetPx() }
+        val originalScroll = state.scrollOffsetPx
+        val totalHeight = state.visualLineCount() * state.lineHeightPx
+        for (scale in listOf(0.25f, 0.5f, 2f, 3f, 4f)) {
+            val viewport = EditorRenderViewport.forScalePreview(
+                state, Size(400f, 600f), scale, Offset(200f, 500f)
+            )
+            assertThat(viewport.visibleLines.isEmpty()).isFalse()
+            assertThat(viewport.visibleLines.first).isAtLeast(0)
+            assertThat(viewport.visibleLines.last).isLessThan(state.visualLineCount())
+            assertThat(viewport.scrollOffsetPx)
+                .isAtMost((totalHeight - viewport.size.height * 0.5f).coerceAtLeast(0f))
+        }
+        assertThat(state.scrollOffsetPx).isEqualTo(originalScroll)
+        assertThat(state.viewportHeightPx).isEqualTo(600f)
+        assertThat(state.maxVerticalScrollOffsetPx()).isEqualTo(originalScroll)
+    }
+
+    @Test
+    fun zoomInOnShortOrEmptyDocument_shouldKeepFirstLineVisible() {
+        for (text in listOf("", "first\nlast")) {
+            val state = EditorState(RopeTextBuffer(text), config = EditorConfig(wordWrap = false))
+            state.updateMetrics(20f, 10f, 600f, 360f, 40f)
+            val viewport = EditorRenderViewport.forScalePreview(
+                state, Size(400f, 600f), 4f, Offset(200f, 500f)
+            )
+            assertThat(viewport.scrollOffsetPx).isEqualTo(0f)
+            assertThat(viewport.visibleLines).isEqualTo(0..(state.visualLineCount() - 1))
+        }
+    }
+
     private fun state() = EditorState(
         RopeTextBuffer().apply { insert(0, List(1000) { "row $it " + "text".repeat(100) }.joinToString("\n")) },
         config = EditorConfig(wordWrap = false)

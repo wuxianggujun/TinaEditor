@@ -53,7 +53,12 @@ class EditorSelectionContextMenuCoordinatorTest {
             EditorContextMenuActionId.Paste,
             EditorContextMenuActionId.SelectAll,
             EditorContextMenuActionId.GotoDefinition,
-            EditorContextMenuActionId.Hover
+            EditorContextMenuActionId.Hover,
+            EditorContextMenuActionId.Find,
+            EditorContextMenuActionId.AddCursorAbove,
+            EditorContextMenuActionId.AddCursorBelow,
+            EditorContextMenuActionId.ToggleCursorTapMode,
+            EditorContextMenuActionId.ClearExtraCursors
         ).inOrder()
     }
 
