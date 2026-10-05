@@ -5,6 +5,13 @@ import java.nio.charset.Charset
 import kotlinx.coroutines.flow.StateFlow
 
 interface TextBuffer : AutoCloseable {
+    /**
+     * Safe to query after close. The default matches this interface's no-op close;
+     * implementations releasing resources must override it. This is a snapshot,
+     * not a lease: another thread may close the buffer before the next read.
+     */
+    val isClosed: Boolean get() = false
+
     val length: Int
     val lineCount: Int
     val version: Long

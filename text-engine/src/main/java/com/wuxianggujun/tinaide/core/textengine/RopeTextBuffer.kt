@@ -67,6 +67,9 @@ class RopeTextBuffer(
         lineIndex.rebuild(initialText)
     }
 
+    override val isClosed: Boolean
+        get() = lock.read { closed }
+
     override val length: Int
         get() = lock.read { ensureOpen(); rope.length }
 
@@ -579,7 +582,7 @@ class RopeTextBuffer(
     }
 
     private fun ensureOpen() {
-        check(!closed) { "RopeTextBuffer is already closed" }
+        if (closed) throw TextBufferClosedException("RopeTextBuffer is already closed")
     }
 
     private fun applyInsert(

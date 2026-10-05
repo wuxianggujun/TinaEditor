@@ -279,114 +279,118 @@ internal fun EditorCanvasLayer(
             }
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            @Suppress("UNUSED_EXPRESSION")
-            state.textVersion
-            @Suppress("UNUSED_EXPRESSION")
-            state.effectiveStylingVersion
-            @Suppress("UNUSED_EXPRESSION")
-            state.inlayHintsVersion
+            drawEditorFrame(state) {
+                @Suppress("UNUSED_EXPRESSION")
+                state.textVersion
+                @Suppress("UNUSED_EXPRESSION")
+                state.effectiveStylingVersion
+                @Suppress("UNUSED_EXPRESSION")
+                state.inlayHintsVersion
 
-            ui.canvasWidthPx = size.width
-            ui.canvasHeightPx = size.height
-            paintApplyState.apply(
-                textPaint = textPaint,
-                lineNumberPaint = lineNumberPaint,
-                typeface = state.typeface,
-                textSizePx = with(density) { state.fontSizeSp.sp.toPx() },
-                lineNumberForegroundArgb = state.colorScheme.lineNumberForeground.toArgb()
-            )
-
-            val visualScale = ui.scaleGestureVisualScale
-            val isVisualScaling = visualScale != 1f
-
-            if (!isVisualScaling) {
-                val contentStartX = renderer.contentStartX(state, lineNumberPaint)
-                ui.contentStartXPx = contentStartX
-                val windowHeightPx = view.rootView.height.toFloat().coerceAtLeast(1f)
-                val visibleBottomPx = (windowHeightPx - imeBottomInsetPx).coerceAtLeast(0f)
-                val canvasBottomInWindowPx = ui.canvasOriginInWindowPx.y.toFloat() + size.height
-                val imeOverlapPx = (canvasBottomInWindowPx - visibleBottomPx).coerceAtLeast(0f)
-                val effectiveViewportHeightPx = (size.height - imeOverlapPx).coerceAtLeast(1f)
-                state.updateMetrics(
-                    lineHeightPx = paintApplyState.lineHeightPx,
-                    charWidthPx = paintApplyState.charWidthPx,
-                    viewportHeightPx = effectiveViewportHeightPx,
-                    viewportWidthPx = (size.width - contentStartX).coerceAtLeast(1f),
-                    contentStartXPx = contentStartX
-                )
-                renderer.render(
-                    drawScope = this,
-                    state = state,
-                    textPaint = textPaint,
-                    lineNumberPaint = lineNumberPaint
-                )
-            } else {
-                drawRect(color = state.colorScheme.background)
-
-                drawEditorScalePreview(
-                    renderer = renderer,
-                    state = state,
+                ui.canvasWidthPx = size.width
+                ui.canvasHeightPx = size.height
+                paintApplyState.apply(
                     textPaint = textPaint,
                     lineNumberPaint = lineNumberPaint,
-                    scale = visualScale,
-                    pivot = Offset(ui.scaleGestureVisualPivotX, ui.scaleGestureVisualPivotY)
+                    typeface = state.typeface,
+                    textSizePx = with(density) { state.fontSizeSp.sp.toPx() },
+                    lineNumberForegroundArgb = state.colorScheme.lineNumberForeground.toArgb()
                 )
-            }
 
-            val scrollbarLayout = scrollbarRenderer.calculateLayout(
-                state = state,
-                canvasWidth = size.width,
-                canvasHeight = size.height,
-                density = density
-            )
-            scrollbarRenderer.draw(
-                drawScope = this,
-                layout = scrollbarLayout,
-                alpha = scrollbarVisibilityCoordinator.alpha.value,
-                colorScheme = state.colorScheme,
-                activeAxis = ui.activeScrollbarDrag?.axis
-            )
+                val visualScale = ui.scaleGestureVisualScale
+                val isVisualScaling = visualScale != 1f
 
-            // 高亮版本变化时重画小地图的 token 层（Picture 缓存按版本失效）。
-            @Suppress("UNUSED_EXPRESSION")
-            state.highlightVersion
-            val minimapLayout = minimapRenderer.calculateLayout(
-                state = state,
-                canvasWidth = size.width,
-                canvasHeight = size.height,
-                density = density
-            )
-            if (minimapLayout != null) {
-                minimapRenderer.draw(
-                    drawScope = this,
-                    layout = minimapLayout,
+                if (!isVisualScaling) {
+                    val contentStartX = renderer.contentStartX(state, lineNumberPaint)
+                    ui.contentStartXPx = contentStartX
+                    val windowHeightPx = view.rootView.height.toFloat().coerceAtLeast(1f)
+                    val visibleBottomPx = (windowHeightPx - imeBottomInsetPx).coerceAtLeast(0f)
+                    val canvasBottomInWindowPx = ui.canvasOriginInWindowPx.y.toFloat() + size.height
+                    val imeOverlapPx = (canvasBottomInWindowPx - visibleBottomPx).coerceAtLeast(0f)
+                    val effectiveViewportHeightPx = (size.height - imeOverlapPx).coerceAtLeast(1f)
+                    state.updateMetrics(
+                        lineHeightPx = paintApplyState.lineHeightPx,
+                        charWidthPx = paintApplyState.charWidthPx,
+                        viewportHeightPx = effectiveViewportHeightPx,
+                        viewportWidthPx = (size.width - contentStartX).coerceAtLeast(1f),
+                        contentStartXPx = contentStartX
+                    )
+                    renderer.render(
+                        drawScope = this,
+                        state = state,
+                        textPaint = textPaint,
+                        lineNumberPaint = lineNumberPaint
+                    )
+                } else {
+                    drawRect(color = state.colorScheme.background)
+
+                    drawEditorScalePreview(
+                        renderer = renderer,
+                        state = state,
+                        textPaint = textPaint,
+                        lineNumberPaint = lineNumberPaint,
+                        scale = visualScale,
+                        pivot = Offset(ui.scaleGestureVisualPivotX, ui.scaleGestureVisualPivotY)
+                    )
+                }
+
+                val scrollbarLayout = scrollbarRenderer.calculateLayout(
                     state = state,
-                    colorScheme = state.colorScheme
+                    canvasWidth = size.width,
+                    canvasHeight = size.height,
+                    density = density
                 )
+                scrollbarRenderer.draw(
+                    drawScope = this,
+                    layout = scrollbarLayout,
+                    alpha = scrollbarVisibilityCoordinator.alpha.value,
+                    colorScheme = state.colorScheme,
+                    activeAxis = ui.activeScrollbarDrag?.axis
+                )
+
+                // 高亮版本变化时重画小地图的 token 层（Picture 缓存按版本失效）。
+                @Suppress("UNUSED_EXPRESSION")
+                state.highlightVersion
+                val minimapLayout = minimapRenderer.calculateLayout(
+                    state = state,
+                    canvasWidth = size.width,
+                    canvasHeight = size.height,
+                    density = density
+                )
+                if (minimapLayout != null) {
+                    minimapRenderer.draw(
+                        drawScope = this,
+                        layout = minimapLayout,
+                        state = state,
+                        colorScheme = state.colorScheme
+                    )
+                }
             }
         }
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val cursorScale = ui.scaleGestureVisualScale
-            val isCursorScaling = cursorScale != 1f
+            drawEditorFrame(state) {
+                val cursorScale = ui.scaleGestureVisualScale
+                val isCursorScaling = cursorScale != 1f
 
-            if (isCursorScaling) {
-                drawEditorScalePreview(
-                    renderer = renderer,
-                    state = state,
-                    textPaint = textPaint,
-                    lineNumberPaint = lineNumberPaint,
-                    scale = cursorScale,
-                    pivot = Offset(ui.scaleGestureVisualPivotX, ui.scaleGestureVisualPivotY),
-                    cursorOverlay = true
-                )
-            } else {
-                renderer.renderCursorOverlay(
-                    drawScope = this,
-                    state = state,
-                    textPaint = textPaint,
-                    lineNumberPaint = lineNumberPaint
-                )
+                if (isCursorScaling) {
+                    drawEditorScalePreview(
+                        renderer = renderer,
+                        state = state,
+                        textPaint = textPaint,
+                        lineNumberPaint = lineNumberPaint,
+                        scale = cursorScale,
+                        pivot = Offset(ui.scaleGestureVisualPivotX, ui.scaleGestureVisualPivotY),
+                        cursorOverlay = true
+                    )
+                } else {
+                    renderer.renderCursorOverlay(
+                        drawScope = this,
+                        state = state,
+                        textPaint = textPaint,
+                        lineNumberPaint = lineNumberPaint
+                    )
+                }
             }
         }
     }
