@@ -462,6 +462,11 @@ class EditorState(
         selectedIndex: Int? = signatureHelpSelectedSignatureIndex
     ) = hoverSignatureController.publishSignatureHelpVisible(result, requestId, selectedIndex)
 
+    /**
+     * Optional syntax highlighting, independent of language-service callbacks.
+     * Null keeps this editor unhighlighted; constructing EditorState never creates
+     * a Tree-sitter parser. The injecting owner manages the highlighter's lifetime.
+     */
     var highlighter by mutableStateOf<SyntaxHighlighter?>(null)
     var semanticTokens by mutableStateOf<List<SemanticToken>>(emptyList())
     var semanticTokensByLine by mutableStateOf<Map<Int, List<SemanticToken>>>(emptyMap())
@@ -742,6 +747,8 @@ class EditorState(
 
     var onLineNumberTap: ((line: Int) -> Unit)? = null
     var onLineNumberLongPress: ((line: Int) -> Unit)? = null
+    // Optional host services, not necessarily LSP. Installing a highlighter does
+    // not attach these callbacks or start a language server (and vice versa).
     var onRequestCompletion: (suspend (Position, Char?) -> EditorCompletionFetchResult)? = null
     var onRequestHover: (suspend (Position) -> String?)? = null
     var onRequestSignatureHelp: (suspend (Position) -> SignatureHelpResult?)? = null

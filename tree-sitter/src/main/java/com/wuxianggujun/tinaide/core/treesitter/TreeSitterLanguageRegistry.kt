@@ -132,6 +132,9 @@ object TreeSitterLanguageRegistry {
             return null
         }
         val resolved = runCatching {
+            // Must precede Class.forName: a failed grammar class initializer cannot
+            // be retried in the same ClassLoader, even if the core is loaded later.
+            TreeSitterRuntime.ensureInitialized()
             val clazz = Class.forName(className)
             val getInstance = clazz.getMethod("getInstance")
             getInstance.invoke(null) as? TSLanguage

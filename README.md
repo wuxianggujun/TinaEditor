@@ -89,6 +89,50 @@ TinaEditor(
 `com.wuxianggujun.tinaide.core.*`，避免本轮搬迁同时改动 JNI 符号与现有 API；
 后续如需重命名，应单独做兼容迁移。
 
+## Tree-sitter 初始化
+
+`TreeSitterLanguageRegistry.resolveLanguage()` 会在初始化任何语法绑定类之前加载核心
+native 库；通过注册表创建高亮器、折叠 provider 的消费者不需要在 Application 中手动加载。
+语言名与文件扩展名查询不会触发 native 加载；grammar 依赖仍需按需显式添加。
+
+宿主如果需要预加载，或直接使用 `TSParser` / `TSLanguage*` 等底层绑定，统一调用：
+
+```kotlin
+import com.wuxianggujun.tinaide.core.treesitter.TreeSitterRuntime
+
+TreeSitterRuntime.ensureInitialized()
+```
+
+初始化使用线程安全的惰性加载：并发调用会等待，成功后不重复执行，失败原样抛出且不缓存
+成功状态。注册表保留带语言上下文的异常日志并返回 null；直接调用方负责记录和处理异常。
+重试不意味着可以修复已经初始化失败的语法类；这类失败需要新进程 / ClassLoader。
+TinaIDE 不再在 Application 中无条件预加载；直接使用 parser 的符号索引服务在自身创建时
+调用同一入口，在创建任何 parser / grammar 之前完成初始化，不影响不使用语言服务的场景。
+
+### 高亮与 LSP 分别选择
+
+两个能力按编辑器实例分别注入，不设置相互绑定的全局开关：
+
+| 场景 | `EditorState.highlighter` | 语言服务回调 / LSP 会话 |
+| --- | --- | --- |
+| 纯文本 | 保持默认 `null` | 保持默认 `null`，宿主不创建 LSP 会话 |
+| 只要语法高亮 | 按需创建并注入高亮器 | 保持默认 `null`，不创建 LSP 会话 |
+| 完整代码编辑 | 按需注入高亮器 | 宿主按需绑定补全、Hover、诊断等服务 |
+| 只用外部语言服务 | 保持 `null` | 宿主自行提供回调 / 语义 token |
+
+kit 不内置 LSP 客户端；设置文件路径或创建 `EditorState` / `TinaEditor` 不会自动启动 LSP
+或创建 Tree-sitter 高亮器。已有的 `highlighter` 与 `onRequestCompletion`、`onRequestHover`
+等可选接口就是各自的控制入口，无需再增加重复的 `lspEnabled` / `highlightEnabled` 状态。
+纯文本场景也不要创建 Tree-sitter 折叠 provider 或符号索引服务，否则它们仍然需要核心库。
+切换为纯文本时，宿主需取消已有请求、解绑并按所有权释放服务；只把回调设为 null 不会替宿主
+关闭已经创建的 LSP 会话。已被其他编辑器使用的共享 native 库不会因单个编辑器关闭高亮而卸载。
+
+`TreeSitterNativeInitializationTest` 与 `TreeSitterLanguageRegistryInitializationTest`
+覆盖不提前加载、成功去重、并发等待、失败重试和注册表初始化顺序。这些 JVM 测试不验证
+设备 ABI、native 打包或实际 JNI 注册；实际高亮仍需冷启动设备回归。
+`EditorOptionalLanguageServicesTest` 另行覆盖纯文本默认值、高亮不启动语言服务、实例之间
+互不影响，以及外部服务不强制创建高亮器。
+
 ## 许可证
 
 本库源代码按 GPL-3.0-or-later 提供，见 [LICENSE](LICENSE)。Tree-sitter Android
