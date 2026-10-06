@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.wuxianggujun.tinaide.core.editorapi.EditorFontSize
 import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.Position
 import com.wuxianggujun.tinaide.core.textengine.TextBuffer
@@ -129,7 +130,12 @@ class EditorState(
         val pos = cursorPosition
         return pos.line to pos.column
     }
-    var fontSizeSp by mutableStateOf(config.fontSizeSp)
+    private var _fontSizeSp by mutableStateOf(EditorFontSize.normalize(config.fontSizeSp))
+    var fontSizeSp: Float
+        get() = _fontSizeSp
+        set(value) {
+            if (value.isFinite()) _fontSizeSp = EditorFontSize.normalize(value)
+        }
     var pinLineNumber by mutableStateOf(config.pinLineNumber)
 
     var scrollOffsetPx: Float
@@ -224,26 +230,13 @@ class EditorState(
         observableStateReady = true
     }
 
-    /**
-     * 双指缩放锚点：用于在字体缩放导致 wordWrap 重排时，保持“手指附近的文本”尽可能稳定。
-     *
-     * 为什么需要它：
-     * - 仅按像素比例缩放 scrollOffset（(old+focus)*scale-focus）在 wordWrap 场景下会失效：
-     *   wrapColumns 会随着字宽变化而变化，视觉行会重排，导致缩放过程中内容“漂移”。
-     * - 我们改为记录缩放发生时焦点附近的 charOffset，在下一帧 metrics 更新后按新布局回推 scrollOffset。
-     *
-     * 生命周期：
-     * - 手势侧在修改 fontSize 前写入
-     * - 下一帧 [updateMetrics] 应用并清空
-     */
-    internal data class PendingScaleAnchor(
+    /** Captured from the last preview, before changing font metrics or unfreezing wrapping. */
+    internal data class ScaleAnchor(
         val charOffset: Int,
         val focusX: Float,
         val focusY: Float,
         val focusYInVisualLineRatio: Float
     )
-
-    internal var pendingScaleAnchor: PendingScaleAnchor? = null
 
     /**
      * wordWrap 缩放策略（对齐 Sora）：
@@ -253,7 +246,7 @@ class EditorState(
      *
      * 这里用 frozenWordWrapColumns 实现同样的冻结效果：
      * - frozen != null 时，visualLineMap() 使用 frozen 的 wrapColumns（保持视觉行分段不变）
-     * - 缩放结束后再清空 frozen，让布局按新字体度量重新分段，并结合 [PendingScaleAnchor] 做最终对齐
+     * - 缩放结束后清空 frozen，按新度量重新分段，并在同一次提交中结合 [ScaleAnchor] 对齐
      */
     internal var frozenWordWrapColumns by mutableStateOf<Int?>(null)
         private set
@@ -945,16 +938,38 @@ class EditorState(
             this@EditorState.viewportHeightPx = viewportHeightPx.coerceAtLeast(1f)
             this@EditorState.viewportWidthPx = viewportWidthPx.coerceAtLeast(1f)
             this@EditorState.contentStartXPx = contentStartXPx.coerceAtLeast(0f)
-            pendingScaleAnchor?.let { anchor ->
-                pendingScaleAnchor = null
-                applyScaleAnchor(anchor)
-            }
             clampScroll()
         }
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
     }
 
-    private fun applyScaleAnchor(anchor: PendingScaleAnchor) {
+    /** Publish one complete viewport, not intermediate font/scroll/word-wrap states. */
+    internal fun commitScaleGeometry(
+        lineHeightPx: Float,
+        charWidthPx: Float,
+        viewportWidthPx: Float,
+        contentStartXPx: Float,
+        scrollOffsetPx: Float,
+        scrollOffsetXPx: Float,
+        wrapAnchor: ScaleAnchor?
+    ) {
+        val oldX = this.scrollOffsetXPx
+        val oldY = this.scrollOffsetPx
+        withObservableStateBatch {
+            this.lineHeightPx = lineHeightPx.coerceAtLeast(1f)
+            this.charWidthPx = charWidthPx.coerceAtLeast(1f)
+            this.viewportWidthPx = viewportWidthPx.coerceAtLeast(1f)
+            this.contentStartXPx = contentStartXPx.coerceAtLeast(0f)
+            unfreezeWordWrapLayout()
+            this.scrollOffsetPx = scrollOffsetPx
+            this.scrollOffsetXPx = scrollOffsetXPx
+            if (wrapAnchor != null) applyScaleAnchor(wrapAnchor)
+            clampScroll()
+        }
+        emitScrollChangedIfNeeded(oldX, oldY)
+    }
+
+    private fun applyScaleAnchor(anchor: ScaleAnchor) {
         val lineCount = textBuffer.lineCount
         if (lineCount <= 0) return
         val safeOffset = anchor.charOffset.coerceIn(0, textBuffer.length)
@@ -1813,9 +1828,8 @@ class EditorState(
                 // wordWrap 开启后横向滚动被禁用，强制回到 0 避免“坐标系漂移”。
                 scrollOffsetXPx = 0f
             } else {
-                // 关闭 wordWrap：清理冻结状态与缩放锚点，避免后续布局计算被旧状态污染。
+                // 关闭 wordWrap：清理冻结状态，避免后续布局计算被旧状态污染。
                 frozenWordWrapColumns = null
-                pendingScaleAnchor = null
             }
         }
 

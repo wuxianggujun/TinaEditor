@@ -22,6 +22,9 @@ screenPosition = scale * (documentPosition - previewScroll)
 固定行号栏在左侧缩放，不随正文横向位移。真实字号、滚动状态、软换行布局及持久化仍由原有协调器管理。
 退出绘制时必须恢复 Canvas 和 DrawScope 尺寸，不能影响物理坐标下的滚动条、小地图。
 
+绘制裁剪使用完整 Canvas 尺寸；滚动上界使用扣除 IME 遮挡的有效视口高度，并按预览比例换算。
+预览到最终字号的锚点交接、精度与宿主回写约束见 [字号精度与缩放收尾](font-scale-handoff.md)。
+
 新增绘制层时不要直接读取 `state.visibleLines` / `state.visualLineTopInViewport`；
 应使用 `EditorRenderFrameContext` 的对应字段/方法，否则缩放预览会再次出现局部缺失。
 

@@ -5,9 +5,7 @@ import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.TransformableState
 import androidx.compose.foundation.gestures.rememberScrollableState
-import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Density
 
@@ -81,16 +79,10 @@ internal fun rememberEditorSessionGestureRuntime(
             scrollbarVisibilityCoordinator = scrollbarVisibilityCoordinator
         )
     }
-    val transformableState = rememberTransformableState { zoomChange, panChange, rotationChange ->
-        scaleTransformCoordinator.onScaleGesture(
-            zoomChange = zoomChange,
-            panChange = panChange,
-            rotationChange = rotationChange
-        )
-    }
-    LaunchedEffect(transformableState.isTransformInProgress) {
-        scaleTransformCoordinator.onTransformProgressChanged(
-            inProgress = transformableState.isTransformInProgress
+    val transformableState = remember(scaleTransformCoordinator) {
+        EditorTransformableState(
+            delegate = TransformableState(scaleTransformCoordinator::onScaleGesture),
+            onTransformFinished = scaleTransformCoordinator::onTransformFinished
         )
     }
 

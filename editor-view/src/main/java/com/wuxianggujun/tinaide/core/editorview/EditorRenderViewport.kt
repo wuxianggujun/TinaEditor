@@ -23,7 +23,10 @@ internal data class EditorRenderViewport(
             // s * (document - scroll) + pivot * (1 - s)
             // = s * (document - previewScroll). Use the preview viewport for both limits;
             // the old viewport's bottom padding can otherwise move every row offscreen.
-            val maxScrollY = state.maxVerticalScrollOffsetPx(size.height)
+            // The Canvas can extend behind the IME. Its drawing height and the effective
+            // scroll viewport are different; use the latter in both preview and commit.
+            val scrollViewportHeight = state.viewportHeightPx.coerceAtMost(canvasSize.height) / scale
+            val maxScrollY = state.maxVerticalScrollOffsetPx(scrollViewportHeight)
             val scrollY = (state.scrollOffsetPx + pivot.y - pivot.y / scale).coerceIn(0f, maxScrollY)
             val scrollX = (state.scrollOffsetXPx + pivot.x - pivot.x / scale).coerceAtLeast(0f)
             val lineHeight = state.lineHeightPx.coerceAtLeast(1f)

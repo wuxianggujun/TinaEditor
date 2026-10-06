@@ -1,43 +1,22 @@
 package com.wuxianggujun.tinaide.core.editorview
 
-import kotlin.math.abs
+import androidx.compose.runtime.snapshots.Snapshot
+import com.wuxianggujun.tinaide.core.editorapi.EditorFontSize
 
 internal class EditorFontScaleCoordinator(
     private val state: EditorState
 ) {
-    fun apply(rawSizeSp: Float) {
-        val targetSize = rawSizeSp.coerceIn(10f, 40f)
-        if (abs(targetSize - state.fontSizeSp) < 0.1f) return
-        state.fontSizeSp = targetSize
-        state.runtimeOptions.onFontSizeChanged(targetSize)
-    }
+    fun apply(rawSizeSp: Float, commitGeometry: () -> Unit = {}) {
+        if (!rawSizeSp.isFinite()) return
+        val targetSize = EditorFontSize.normalize(rawSizeSp)
+        if (targetSize == state.fontSizeSp) return
 
-    fun applyWithAnchor(
-        rawSizeSp: Float,
-        focusX: Float,
-        focusY: Float,
-        contentStartXPx: Float
-    ) {
-        val previousSize = state.fontSizeSp
-        val targetSize = rawSizeSp.coerceIn(10f, 40f)
-        if (abs(targetSize - previousSize) < 0.1f) return
-
-        val scale = (targetSize / previousSize).coerceIn(0.5f, 2f)
-        // scrollOffsetX 只作用在文本区（不包含行号/ gutter），因此横向锚点必须使用“文本区内的 viewportX”。
-        // 否则在固定栏存在时会出现缩放后内容向左/向右“漂移”的错位感。
-        val textViewportWidthPx = state.viewportWidthPx.coerceAtLeast(1f)
-        val focusXInTextViewport = (focusX - contentStartXPx)
-            .coerceIn(0f, textViewportWidthPx)
-        val targetScrollX = if (state.config.wordWrap) {
-            0f
-        } else {
-            (state.scrollOffsetXPx + focusXInTextViewport) * scale - focusXInTextViewport
+        // Do not publish a font change while the viewport still contains the old metrics.
+        // The host may synchronously echo the preference or inspect the committed geometry.
+        Snapshot.withMutableSnapshot {
+            state.fontSizeSp = targetSize
+            commitGeometry()
         }
-        val targetScrollY = (state.scrollOffsetPx + focusY) * scale - focusY
-
-        state.fontSizeSp = targetSize
-        state.scrollOffsetXPx = targetScrollX.coerceAtLeast(0f)
-        state.scrollOffsetPx = targetScrollY.coerceAtLeast(0f)
         state.runtimeOptions.onFontSizeChanged(targetSize)
     }
 }

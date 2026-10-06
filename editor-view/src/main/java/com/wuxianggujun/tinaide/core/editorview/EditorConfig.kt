@@ -1,5 +1,7 @@
 package com.wuxianggujun.tinaide.core.editorview
 
+import com.wuxianggujun.tinaide.core.editorapi.EditorFontSize
+
 enum class WhitespaceRenderMode {
     NONE,
     BOUNDARY,
@@ -16,7 +18,7 @@ data class EditorConfig(
      */
     val pinLineNumber: Boolean = false,
     val useRelativeLineNumbers: Boolean = false,
-    val fontSizeSp: Float = 14f,
+    val fontSizeSp: Float = EditorFontSize.DEFAULT_SP,
     val imeWindowChars: Int = 512,
     val imeWindowMarginChars: Int = 128,
     val lineRenderCacheSize: Int = 512,
