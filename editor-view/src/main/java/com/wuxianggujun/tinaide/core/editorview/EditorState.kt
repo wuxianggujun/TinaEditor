@@ -11,6 +11,7 @@ import com.wuxianggujun.tinaide.core.editorapi.EditorFontSize
 import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.Position
 import com.wuxianggujun.tinaide.core.textengine.TextBuffer
+import com.wuxianggujun.tinaide.core.textengine.TextBufferClosedException
 import com.wuxianggujun.tinaide.core.textengine.TextChange
 import com.wuxianggujun.tinaide.core.textengine.TextScanKernel
 import com.wuxianggujun.tinaide.core.textengine.WordBounds
@@ -769,7 +770,16 @@ class EditorState(
     val firstVisibleLine: Int
         get() = floor(scrollOffsetPx / lineHeightPx).toInt().coerceAtLeast(0)
 
-    val visibleLines by derivedStateOf {
+    // A derived calculation can run during global snapshot invalidation, after its
+    // old UI scope has lost the buffer but before that observer has been removed.
+    private val visibleLineRange by derivedStateOf {
+        readVisibleRangeWhileOpen { calculateVisibleLines() }
+    }
+
+    val visibleLines: IntRange
+        get() = if (textBuffer.isClosed) IntRange.EMPTY else visibleLineRange
+
+    private fun calculateVisibleLines(): IntRange {
         // 依赖 textVersion 以确保文本变化时重新计算
         @Suppress("UNUSED_EXPRESSION")
         textVersion
@@ -792,7 +802,7 @@ class EditorState(
         val visibleCount = (viewportHeightPx / lineHeightPx).toInt() + 2
         val maxVisualLine = (visualLineCount() - 1).coerceAtLeast(0)
         val last = (first + visibleCount).coerceAtMost(maxVisualLine)
-        first..last
+        return first..last
     }
 
     /**
@@ -802,17 +812,29 @@ class EditorState(
      * 这里返回“可见视觉窗口对应的首/末文档行”形成的范围（可能包含被折叠隐藏的行）。
      */
     val visibleDocumentLines: IntRange
-        get() {
+        get() = readVisibleRangeWhileOpen {
             val visualRange = visibleLines
-            if (visualRange.isEmpty()) return 0..-1
+            if (visualRange.isEmpty()) return@readVisibleRangeWhileOpen IntRange.EMPTY
             val totalVisualLines = visualLineCount()
-            if (totalVisualLines <= 0) return 0..-1
+            if (totalVisualLines <= 0) return@readVisibleRangeWhileOpen IntRange.EMPTY
             val firstVisual = visualRange.first.coerceIn(0, totalVisualLines - 1)
             val lastVisual = visualRange.last.coerceIn(firstVisual, totalVisualLines - 1)
             val firstDoc = docLineForVisualLine(firstVisual)
             val lastDoc = docLineForVisualLine(lastVisual)
-            return firstDoc..lastDoc
+            firstDoc..lastDoc
         }
+
+    private inline fun readVisibleRangeWhileOpen(read: () -> IntRange): IntRange {
+        if (textBuffer.isClosed) return IntRange.EMPTY
+        return try {
+            read()
+        } catch (failure: TextBufferClosedException) {
+            // isClosed is not a lease: close may win between the check and a read.
+            // Keep buffer access fail-fast and only retire observations of this closed buffer.
+            if (!textBuffer.isClosed) throw failure
+            IntRange.EMPTY
+        }
+    }
 
     internal fun docLineForVisualLine(visualLine: Int): Int {
         val map = visualLineMap()
