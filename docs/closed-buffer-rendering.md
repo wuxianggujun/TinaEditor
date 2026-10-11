@@ -1,4 +1,4 @@
-# 编辑器关闭后的残留绘制帧
+# 编辑器关闭后的残留绘制帧与快照观察
 
 ## 触发条件与复现
 
@@ -58,3 +58,41 @@ EditorCanvasLayer → EditorRenderer.contentStartX → hitZones
 真机分别在普通编辑、持续缩放、光标闪烁和小地图开启时快速关闭标签或切换工程，
 检查无主线程绘制崩溃，并重新打开文档验证正文、光标和高亮正常。
 JVM / Robolectric 测试不替代 Android GPU、IME 和完整宿主生命周期的设备测试。
+
+## 保存/关闭时的快照重算（2026-10-12）
+
+TinaIDE `0.18.35` 的崩溃栈经对应 mapping 还原后，实际路径是：
+
+```text
+SnapshotStateObserver.recordInvalidation → DerivedSnapshotState.currentRecord
+→ EditorState.visibleLines → EditorVisualLineMapper.visualLineMap
+→ RopeTextBuffer.lineCount → TextBufferClosedException
+```
+
+该计算发生在全局 Snapshot 应用通知中，早于残留观察者移除，不经过 Canvas 绘制边界。
+仅保护渲染无法覆盖它。`EditorClosedSnapshotTest` 注册真实 `SnapshotStateObserver`，
+先使可见行依赖失效，再关闭 buffer，最后发送应用通知；修复前得到上述相同调用链。
+
+- `visibleLines` 的派生计算和 `visibleDocumentLines` 查询均在关闭后返回空范围，表示旧视口已退出。
+- getter 也检查关闭状态，避免没有新 Snapshot 变更时重用已缓存的可见范围。
+- 检查与映射读取之间发生关闭时，仅恢复当前 buffer 已关闭的 `TextBufferClosedException`。
+- 不吞无关映射错误，也不改变 `TextBuffer` 关闭后直接访问必须抛异常的约定。
+- 宿主仍需为挂载中的页面保留运行时，等最后一个页面的 effects 退出后再释放资源。
+
+```bash
+./gradlew :core:editor-view:testDebugUnitTest --tests '*EditorClosedSnapshotTest' --tests '*EditorDrawFrameTest' --tests '*EditorCanvasClosedBufferTest' --tests '*EditorRuntimeEffectsTest' --tests '*EditorScaleGestureLifecycleTest' --tests '*EditorScaleTransformCoordinatorTest' --no-daemon --console=plain
+./gradlew :core:editor-view:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.wuxianggujun.tinaide.core.editorview.EditorLifecycleInstrumentationTest --no-daemon --console=plain
+```
+
+本轮 JVM / Robolectric 关闭回归 13 项、缩放回归 13 项，共 26 项通过，0 失败、0 跳过；
+其中 5 项新测试覆盖全局失效、缓存、跨线程关闭、无关错误传播和错误关闭异常传播。
+
+Android 14 / API 34 模拟器上的 `EditorLifecycleInstrumentationTest` 两项测试连续运行
+3 轮均通过，覆盖真实全局快照失效、双指字号单次提交、焦点下文档锚点、松手后多帧稳定及随后单指滚动。
+未在报告中的 Redmi 真机回测。
+
+真实触摸还验证了 modifier 的消费顺序：Main pass 从内向外传递，transformable 必须位于
+轴向 scrollable 的内侧，并用 `canPan = { false }` 把单指拖动留给 scroller。
+否则 scroller 可能在 `enabled` 重组前先消费缩放移动，导致字号回调根本没有提交。
+测试的单指滑动从正文区域开始，不从底边的横向滚动条热区开始；缩放结束后推进时钟，
+等待既有的 100 ms 多指保护窗口结束，再验证新手势。

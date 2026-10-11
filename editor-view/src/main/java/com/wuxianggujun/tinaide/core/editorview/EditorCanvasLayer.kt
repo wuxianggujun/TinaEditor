@@ -235,7 +235,6 @@ internal fun EditorCanvasLayer(
                     }
                 }
             }
-            .transformable(state = session.transformableState)
             .scrollable(
                 state = session.verticalScrollableState,
                 orientation = Orientation.Vertical,
@@ -248,6 +247,10 @@ internal fun EditorCanvasLayer(
                 flingBehavior = session.horizontalFlingBehavior,
                 enabled = scrollGestureCoordinator.shouldEnableHorizontalScrollable()
             )
+            // Main-pass events travel inside-out. Let zoom claim two-finger motion
+            // before an axis scroller consumes it, even before enabled recomposes.
+            // Panning belongs to the scrollers; otherwise one-finger drags are lost.
+            .transformable(state = session.transformableState, canPan = { false })
             .pointerInput(state, ui.canvasHeightPx) {
                 detectTapGestures(
                     onTap = { pos ->
