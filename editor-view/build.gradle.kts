@@ -34,10 +34,12 @@ ktlint {
 dependencies {
     api(project(":core:editor-api"))
     api(project(":core:text-engine"))
+    implementation(project(":core:language-support"))
 
     implementation(libs.kotlinx.coroutines)
     implementation(libs.timber)
     implementation(libs.androidx.collection)
+    implementation("com.google.re2j:re2j:1.8")
     coreLibraryDesugaring(libs.desugar)
 
     implementation(platform(libs.compose.bom))

@@ -288,17 +288,17 @@ class IncrementalTreeSitterHighlightStateTest {
             fixture.state.applyTextChange(
                 TextChange(
                     startOffset = oldText.indexOf("value"),
-                    endOffset = oldText.indexOf("value"),
-                    oldText = "",
-                    newText = "/**",
+                    endOffset = oldText.lastIndexOf("\n}"),
+                    oldText = "value();\nreturn 0;",
+                    newText = "/**value();\nreturn 0;*/",
                     startLine = 1,
                     startColumn = 0,
-                    endLine = 1,
-                    endColumn = 0,
+                    endLine = 2,
+                    endColumn = 9,
                 ),
-                newText,
             )
             waitUntil { updates.get() == 2 }
+            assertThat(fixture.state.readSnapshot(newText)).isNotNull()
         }
 
         verify(exactly = 1) { newWorker.getChangedRanges(oldWorker) }

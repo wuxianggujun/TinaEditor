@@ -8,9 +8,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [34])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class EditorInlayHintLayoutTest {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.MONOSPACE
@@ -30,7 +32,6 @@ class EditorInlayHintLayoutTest {
         assertThat(secondLineVisualRow).isGreaterThan(1)
         assertThat(topLayout.inlayHintPlacements).hasSize(1)
         buffer.addChangeListener { change ->
-            state.applyTextBufferChange(change)
             cache.applyTextChange(change, change.documentVersion)
         }
 

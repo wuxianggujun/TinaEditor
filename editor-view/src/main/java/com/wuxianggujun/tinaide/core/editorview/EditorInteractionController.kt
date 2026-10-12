@@ -176,7 +176,7 @@ internal class EditorInteractionController(
     fun requestManualCompletion() {
         dismissHover()
         coroutineScope.launch {
-            state.requestCompletion(null)
+            state.completion.requestCompletion(null)
         }
     }
 
@@ -184,13 +184,13 @@ internal class EditorInteractionController(
         dismissHover()
         cancelPendingSignatureHelpRequest()
         signatureHelpRequestJob = coroutineScope.launch {
-            state.requestSignatureHelp()
+            state.assistance.requestSignatureHelp()
         }
     }
 
     fun dismissCompletion() {
         cancelPendingCompletionRequest()
-        state.dismissCompletion()
+        state.completion.dismissCompletion()
     }
 
     fun cancelPendingCompletionRequest() {
@@ -211,20 +211,20 @@ internal class EditorInteractionController(
             dismissCompletion()
             dismissSignatureHelp()
         }
-        state.dismissHover()
+        state.assistance.dismissHover()
         hoverRequestJob = coroutineScope.launch {
-            state.requestHover(position)
+            state.assistance.requestHover(position)
         }
     }
 
     fun dismissHover() {
         cancelPendingHoverRequest()
-        state.dismissHover()
+        state.assistance.dismissHover()
     }
 
     fun dismissSignatureHelp() {
         cancelPendingSignatureHelpRequest()
-        state.dismissSignatureHelp()
+        state.assistance.dismissSignatureHelp()
     }
 
     fun cancelPendingHoverRequest() {
@@ -259,7 +259,7 @@ internal class EditorInteractionController(
         cancelPendingCompletionRequest()
         completionRequestJob = coroutineScope.launch {
             delay(COMPLETION_TRIGGER_DEBOUNCE_MS)
-            state.requestCompletion(trigger)
+            state.completion.requestCompletion(trigger)
         }
     }
 
@@ -267,7 +267,7 @@ internal class EditorInteractionController(
         cancelPendingSignatureHelpRequest()
         signatureHelpRequestJob = coroutineScope.launch {
             delay(SIGNATURE_HELP_TRIGGER_DEBOUNCE_MS)
-            state.requestSignatureHelp()
+            state.assistance.requestSignatureHelp()
         }
     }
 
@@ -320,13 +320,13 @@ internal class EditorInteractionController(
             )
         ) {
             if (!isTriggerCharacter(trigger, charBeforeTrigger) &&
-                state.completionUiState !is CompletionUiState.Hidden &&
-                state.cachedCompletionResults.isNotEmpty()
+                state.completion.completionUiState !is CompletionUiState.Hidden &&
+                state.completion.cachedCompletionResults.isNotEmpty()
             ) {
                 val newQuery = state.completionQueryFromCursor()
-                if (isCompletionPrefixExtension(state.cachedCompletionPrefix, newQuery)) {
+                if (isCompletionPrefixExtension(state.completion.cachedCompletionPrefix, newQuery)) {
                     cancelPendingCompletionRequest()
-                    state.refilterCompletion()
+                    state.completion.refilterCompletion()
                     return
                 }
             }
@@ -340,7 +340,7 @@ internal class EditorInteractionController(
         allowAutoSignatureHelpRefresh: Boolean
     ) {
         val action = resolveSignatureHelpAutoRefreshAction(
-            isVisible = state.signatureHelpUiState !is SignatureHelpUiState.Hidden,
+            isVisible = state.assistance.signatureHelpUiState !is SignatureHelpUiState.Hidden,
             hasSelection = state.selectionRange?.isEmpty == false,
             hasActiveContext = hasActiveSignatureHelpContext(
                 textBuffer = state.textBuffer,

@@ -9,7 +9,6 @@ import androidx.compose.ui.unit.Density
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.core.treesitter.HighlightLineSegment
-import com.wuxianggujun.tinaide.core.treesitter.HighlightSpan
 import com.wuxianggujun.tinaide.core.treesitter.HighlightType
 import com.wuxianggujun.tinaide.core.treesitter.SyntaxHighlighter
 import org.junit.Test
@@ -221,7 +220,7 @@ class EditorMinimapRendererTest {
     private class RecordingHighlighter : SyntaxHighlighter {
         val requestedLines = mutableListOf<Int>()
 
-        override fun highlight(text: String, visibleRange: IntRange): List<HighlightSpan> = emptyList()
+        override fun openDocumentBlocking(text: String) = Unit
 
         override fun getLineSegments(line: Int): List<HighlightLineSegment> {
             requestedLines += line

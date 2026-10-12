@@ -1,5 +1,7 @@
 package com.wuxianggujun.tinaide.core.editorview
 
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenModifier
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenType
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.google.common.truth.Truth.assertThat
@@ -124,7 +126,7 @@ class EditorLineRenderPlanCacheTest {
         cache: EditorLineRenderPlanCache,
         line: Int = 0,
         text: String = "abcdefghij",
-        syntax: List<LineHighlightSegment> = this.syntax,
+        syntax: List<HighlightLineSegment> = this.syntax,
         semantic: List<LineSemanticSegment> = emptyList(),
     ): TextLineRenderPlan = cache.getOrBuild(line, text, syntax, semantic, emptyList(), colors, noRainbow)
 

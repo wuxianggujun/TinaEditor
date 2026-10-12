@@ -1,5 +1,9 @@
 package com.wuxianggujun.tinaide.core.editorview
 
+import com.wuxianggujun.tinaide.core.treesitter.HighlightLineSegment
+
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenModifier
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenType
 import androidx.compose.ui.graphics.toArgb
 import com.wuxianggujun.tinaide.core.treesitter.HighlightType
 import java.util.LinkedHashMap
@@ -45,7 +49,7 @@ internal class EditorLineRenderPlanCache(
 ) {
     private data class Entry(
         val text: String,
-        val syntax: List<LineHighlightSegment>,
+        val syntax: List<HighlightLineSegment>,
         val semantic: List<LineSemanticSegment>,
         val brackets: List<RainbowBracketComputer.BracketInfo>,
         val plan: TextLineRenderPlan,
@@ -78,7 +82,7 @@ internal class EditorLineRenderPlanCache(
     fun getOrBuild(
         line: Int,
         text: String,
-        syntax: List<LineHighlightSegment>,
+        syntax: List<HighlightLineSegment>,
         semantic: List<LineSemanticSegment>,
         brackets: List<RainbowBracketComputer.BracketInfo>,
         colors: EditorSyntaxColors,
@@ -116,7 +120,7 @@ internal class EditorLineRenderPlanCache(
 
     private fun buildPlan(
         textLength: Int,
-        syntax: List<LineHighlightSegment>,
+        syntax: List<HighlightLineSegment>,
         semantic: List<LineSemanticSegment>,
         brackets: List<RainbowBracketComputer.BracketInfo>,
         colors: EditorSyntaxColors,

@@ -15,9 +15,9 @@ class EditorHoverStateTest {
             "**Variable** `APP_NAME`"
         }
 
-        state.requestHover()
+        state.assistance.requestHover()
 
-        val hoverState = state.hoverUiState
+        val hoverState = state.assistance.hoverUiState
         assertThat(hoverState).isInstanceOf(HoverUiState.Visible::class.java)
         assertThat((hoverState as HoverUiState.Visible).markdown).contains("APP_NAME")
     }
@@ -28,11 +28,11 @@ class EditorHoverStateTest {
         state.onRequestHover = {
             "**Target** `core`"
         }
-        state.requestHover()
+        state.assistance.requestHover()
 
-        state.dismissHover()
+        state.assistance.dismissHover()
 
-        assertThat(state.hoverUiState).isEqualTo(HoverUiState.Hidden)
+        assertThat(state.assistance.hoverUiState).isEqualTo(HoverUiState.Hidden)
     }
 
     @Test
@@ -42,12 +42,12 @@ class EditorHoverStateTest {
         var cancellationPropagated = false
 
         try {
-            state.requestHover()
+            state.assistance.requestHover()
         } catch (_: CancellationException) {
             cancellationPropagated = true
         }
 
         assertThat(cancellationPropagated).isTrue()
-        assertThat(state.hoverUiState).isEqualTo(HoverUiState.Hidden)
+        assertThat(state.assistance.hoverUiState).isEqualTo(HoverUiState.Hidden)
     }
 }

@@ -2,6 +2,7 @@ package io.github.tinaide.editor.example
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.wuxianggujun.tinaide.core.editorview.EditorState
@@ -41,4 +42,10 @@ fun EditorExample() {
         modifier = Modifier.fillMaxSize(),
         onToggleLineComment = { editorState.toggleLineComment("//") }
     )
+    DisposableEffect(editorState) {
+        onDispose {
+            editorState.close()
+            buffer.close()
+        }
+    }
 }

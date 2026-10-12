@@ -10,7 +10,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.IntOffset
 import com.google.common.truth.Truth.assertThat
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import org.junit.Rule
 import org.junit.Test
@@ -86,7 +86,7 @@ class EditorOverlaysIntegrationTest {
         composeRule.runOnIdle {
             assertThat(state.textBuffer.substring(0, state.textBuffer.length))
                 .isEqualTo("veryLongPrefixSegment_private")
-            assertThat(state.completionUiState).isEqualTo(CompletionUiState.Hidden)
+            assertThat(state.completion.completionUiState).isEqualTo(CompletionUiState.Hidden)
         }
     }
 
@@ -176,7 +176,7 @@ class EditorOverlaysIntegrationTest {
 
         composeRule.runOnIdle {
             assertThat(state.textBuffer.getLine(1)).isEqualTo("veryLongPrefixSegment_private")
-            assertThat(state.completionUiState).isEqualTo(CompletionUiState.Hidden)
+            assertThat(state.completion.completionUiState).isEqualTo(CompletionUiState.Hidden)
         }
     }
 
@@ -230,12 +230,12 @@ class EditorOverlaysIntegrationTest {
         composeRule.waitForIdle()
 
         composeRule.runOnIdle {
-            assertThat(state.selectSignatureHelp(1)).isTrue()
+            assertThat(state.assistance.selectSignatureHelp(1)).isTrue()
         }
         composeRule.waitForIdle()
 
         composeRule.runOnIdle {
-            assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(1)
+            assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(1)
         }
         assertThat(composeRule.onNodeWithText("2/2").fetchSemanticsNode()).isNotNull()
     }

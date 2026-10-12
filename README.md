@@ -8,7 +8,7 @@
 
 | 模块 | 职责 |
 | --- | --- |
-| `:core:editor-api` | 主题键、语义 token 与 Signature Help 公共模型，并向后兼容导出文件类型能力 |
+| `:core:editor-api` | 主题键、语义 token 与 Signature Help 公共模型 |
 | `:core:language-support` | C/C++ 与 Makefile 文件识别规则，供宿主和 Tree-sitter 复用 |
 | `:core:text-engine` | Rope、行索引、编辑历史、JNI 文本扫描 |
 | `:core:tree-sitter` | 语法高亮、语言注册、折叠区域核心（不内置 grammar 依赖） |
@@ -19,6 +19,14 @@ TinaIDE 的 `:core:editor-lsp`、`:feature:editor`、项目路径、编译运行
 **不属于此库**。宿主通过 `EditorState` 的回调接入补全、诊断、语义 token 等服务；
 `EditorRuntimeOptions` 接入字体大小持久化和调试开关；`TinaEditor(hoverContent = ...)`
 可替换默认的纯文本 Hover 内容。
+
+### 当前接口与资源所有权
+
+- `EditorState` 自己订阅 `TextBuffer` 的变化，统一更新高亮、折叠、选区、inlay 与渲染缓存。宿主不再补接文本监听器；回调应运行在编辑器所属线程。
+- 折叠使用 `state.folding`，文档查找使用 `state.find`。补全、Hover、Signature Help 的内部调用直接进入各自 controller，不再经过 `EditorState` 转发接口。
+- 关闭文档时先调用 `state.close()`，再由文档所有者释放 highlighter、语言服务与 buffer。移除一个可见编辑器视图不等于关闭文档。
+- 高亮只有 `openDocument` / `openDocumentBlocking` → `applyTextChange` → `getLineSegments` 一条路径；不提供无状态全文高亮接口或传入第二份文本的重载。
+- 语义模型统一位于 `core.editorapi`；主题只使用 `EditorThemeColorKey.wireName`，不再接受数字 ID 或旧主题别名。需要文件类型能力时直接依赖 `:core:language-support`。
 
 ## 构建
 
@@ -79,15 +87,20 @@ TinaEditor(
     modifier = Modifier.fillMaxSize(),
     onToggleLineComment = { editorState.toggleLineComment("//") }
 )
+DisposableEffect(editorState) {
+    onDispose {
+        editorState.close()
+        buffer.close()
+    }
+}
 ```
 
 `onToggleLineComment` 为可选能力。提供后，编辑器会把 `Ctrl+/` 转发给宿主；回调返回
 `true` 表示文本确实发生变化，编辑器据此同步 IME 和外部编辑状态。注释符号由宿主根据当前
 文件语言决定，编辑器内核不依赖宿主的语言配置；不提供回调时不会拦截该快捷键。
 
-应用需自行提供 Activity、Compose 主题、文件读写和语法/LSP 服务。库的包名暂保留
-`com.wuxianggujun.tinaide.core.*`，避免本轮搬迁同时改动 JNI 符号与现有 API；
-后续如需重命名，应单独做兼容迁移。
+应用需自行提供 Activity、Compose 主题、文件读写和语法/LSP 服务。
+库的公开包名为 `com.wuxianggujun.tinaide.core.*`，native 绑定由对应模块管理。
 
 ## Tree-sitter 初始化
 

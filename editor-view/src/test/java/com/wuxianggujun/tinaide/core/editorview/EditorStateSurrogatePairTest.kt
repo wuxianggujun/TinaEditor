@@ -89,7 +89,6 @@ class EditorStateSurrogatePairTest {
         val buffer = RopeTextBuffer("abcdef")
         val state = EditorState(buffer)
         state.selectRange(startOffset = 6, endOffset = 4)
-        buffer.addChangeListener { change -> state.applyTextBufferChange(change) }
 
         buffer.replaceAll("a\uD83D\uDE00")
 

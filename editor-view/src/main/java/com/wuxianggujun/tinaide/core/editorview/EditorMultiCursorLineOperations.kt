@@ -391,7 +391,7 @@ private fun applyMultiCursorLineEditPlan(
     if (changedEdits.isEmpty()) return false
 
     val selectionBefore = state.selectionSet
-    state.cancelSnippet()
+    state.completion.cancelSnippet()
     state.textBuffer.editTransaction(
         cursorBefore = selectionBefore.primary.caret,
         cursorAfter = { selectionAfter.primary.caret },

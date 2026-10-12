@@ -19,10 +19,10 @@ class EditorSnippetSyncEditingTest {
 
         assertThat(state.textBuffer.substring(0, state.textBuffer.length))
             .isEqualTo("const value = value;")
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.length })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.length })
             .containsExactly(5, 5)
             .inOrder()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.offsetInText })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.offsetInText })
             .containsExactly(6, 14)
             .inOrder()
         assertThat(state.cursorOffset).isEqualTo(11)
@@ -38,10 +38,10 @@ class EditorSnippetSyncEditingTest {
 
         assertThat(state.textBuffer.substring(0, state.textBuffer.length))
             .isEqualTo("const naXme = naXme;")
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.length })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.length })
             .containsExactly(5, 5)
             .inOrder()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.offsetInText })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.offsetInText })
             .containsExactly(6, 14)
             .inOrder()
         assertThat(state.cursorOffset).isEqualTo(9)
@@ -56,10 +56,10 @@ class EditorSnippetSyncEditingTest {
 
         assertThat(state.textBuffer.substring(0, state.textBuffer.length))
             .isEqualTo("const valu = valu;")
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.length })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.length })
             .containsExactly(4, 4)
             .inOrder()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.offsetInText })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.offsetInText })
             .containsExactly(6, 13)
             .inOrder()
         assertThat(state.cursorOffset).isEqualTo(10)
@@ -74,10 +74,10 @@ class EditorSnippetSyncEditingTest {
 
         assertThat(state.textBuffer.substring(0, state.textBuffer.length))
             .isEqualTo("const nae = nae;")
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.length })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.length })
             .containsExactly(3, 3)
             .inOrder()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.offsetInText })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.offsetInText })
             .containsExactly(6, 12)
             .inOrder()
         assertThat(state.cursorOffset).isEqualTo(8)
@@ -97,10 +97,10 @@ class EditorSnippetSyncEditingTest {
         assertThat(replaced).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length))
             .isEqualTo("const nXYe = nXYe;")
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.length })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.length })
             .containsExactly(4, 4)
             .inOrder()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.offsetInText })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.offsetInText })
             .containsExactly(6, 13)
             .inOrder()
         assertThat(state.cursorOffset).isEqualTo(9)
@@ -116,10 +116,10 @@ class EditorSnippetSyncEditingTest {
         assertThat(replaced).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length))
             .isEqualTo("const value = value;")
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.length })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.length })
             .containsExactly(5, 5)
             .inOrder()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.offsetInText })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.offsetInText })
             .containsExactly(6, 14)
             .inOrder()
         assertThat(state.cursorOffset).isEqualTo(11)
@@ -147,7 +147,7 @@ class EditorSnippetSyncEditingTest {
             insert(0, parsed.expandedText)
         }
         return EditorState(buffer).apply {
-            startSnippetSession(
+            completion.startSnippetSession(
                 SnippetSession(
                     baseOffset = 0,
                     parsed = parsed

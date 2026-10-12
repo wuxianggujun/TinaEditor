@@ -3,6 +3,8 @@ package com.wuxianggujun.tinaide.core.editorview
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.wuxianggujun.tinaide.core.config.EditorThemeColorKey
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenModifier
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenType
 import com.wuxianggujun.tinaide.core.treesitter.HighlightType
 import java.util.Locale
 
@@ -203,272 +205,68 @@ data class EditorColorScheme(
             )
         }
 
-        /**
-         * 将插件主题（ThemeConfig.colors）映射为编辑器配色。
-         *
-         * 兼容两套 key（按优先级从高到低）：
-         *
-         * 1) 数字 ID（文档约定，覆盖常量名）：
-         * - 4/WHOLE_BACKGROUND: 编辑器背景
-         * - 5/TEXT_NORMAL: 普通文本
-         * - 3/LINE_NUMBER_BACKGROUND: 行号区背景（同时用于 gutter 背景）
-         * - 1/LINE_DIVIDER: 分割线（用于 gutter 分割线）
-         * - 2/LINE_NUMBER: 行号文字
-         * - 45/LINE_NUMBER_CURRENT: 当前行号文字
-         * - 6/SELECTED_TEXT_BACKGROUND: 选区背景
-         * - 9/CURRENT_LINE: 当前行背景
-         * - 7/SELECTION_INSERT: 光标
-         * - 8/SELECTION_HANDLE: 选择手柄
-         * - 13/SCROLL_BAR_TRACK: 滚动条轨道
-         * - 11/SCROLL_BAR_THUMB: 滚动条滑块
-         * - 12/SCROLL_BAR_THUMB_PRESSED: 滚动条按下/hover
-         * - 21/KEYWORD, 22/COMMENT, 23/OPERATOR, 24/LITERAL, 25/IDENTIFIER_VAR, 26/IDENTIFIER_NAME, 27/FUNCTION_NAME: 语法高亮
-         *
-         * 2) 新 key（便于后续扩展）：
-         * - editor.background / editor.foreground / editor.selection / editor.cursor / editor.cursorLine
-         * - editor.lineNumber / editor.lineNumberActive
-         * - gutter.background / gutter.divider
-         * - scrollbar.track / scrollbar.thumb / scrollbar.thumbHover
-         * - syntax.keyword / syntax.string / syntax.number / syntax.comment / syntax.function / syntax.variable / syntax.type / syntax.operator / syntax.punctuation
-         */
+        /** Only canonical EditorThemeColorKey wire names are accepted. */
         fun fromThemeColors(
             colors: Map<String, String>,
             fallback: EditorColorScheme = builtinGray()
         ): EditorColorScheme {
-            fun parse(key: String): Color? = parseColorOrNull(colors[key])
-
-            fun pick(default: Color, vararg keys: String): Color {
-                for (key in keys) {
-                    val parsed = parse(key)
-                    if (parsed != null) return parsed
-                }
-                return default
-            }
-
-            val background = pick(
-                fallback.background,
-                "4",
-                "WHOLE_BACKGROUND",
-                EditorThemeColorKey.EDITOR_BACKGROUND.wireName
-            )
-            val foreground = pick(
-                fallback.foreground,
-                "5",
-                "TEXT_NORMAL",
-                EditorThemeColorKey.EDITOR_FOREGROUND.wireName
-            )
-            val gutterBackground = pick(
-                fallback.gutterBackground,
-                "3",
-                "LINE_NUMBER_BACKGROUND",
-                EditorThemeColorKey.GUTTER_BACKGROUND.wireName
-            )
-            val gutterDivider = pick(
-                fallback.gutterDivider,
-                "1",
-                "LINE_DIVIDER",
-                EditorThemeColorKey.GUTTER_DIVIDER.wireName
-            )
-
-            val lineNumberForeground = pick(
-                fallback.lineNumberForeground,
-                "2",
-                "LINE_NUMBER",
-                EditorThemeColorKey.EDITOR_LINE_NUMBER.wireName
-            )
-            val lineNumberForegroundActive = pick(
-                fallback.lineNumberForegroundActive,
-                "45",
-                "LINE_NUMBER_CURRENT",
-                EditorThemeColorKey.EDITOR_LINE_NUMBER_ACTIVE.wireName
-            )
-            val selectionBackground = pick(
-                fallback.selectionBackground,
-                "6",
-                "SELECTED_TEXT_BACKGROUND",
-                EditorThemeColorKey.EDITOR_SELECTION.wireName
-            )
-            val currentLineBackground = pick(
-                fallback.currentLineBackground,
-                "9",
-                "CURRENT_LINE",
-                EditorThemeColorKey.EDITOR_CURSOR_LINE.wireName
-            )
-            val cursor = pick(
-                fallback.cursor,
-                "7",
-                "SELECTION_INSERT",
-                EditorThemeColorKey.EDITOR_CURSOR.wireName
-            )
-            val selectionHandle = pick(
-                fallback.selectionHandle,
-                "8",
-                "SELECTION_HANDLE"
-            )
-            val scrollbarTrack = pick(
-                fallback.scrollbarTrack,
-                "13",
-                "SCROLL_BAR_TRACK",
-                "scrollbar.track"
-            )
-            val scrollbarThumb = pick(
-                fallback.scrollbarThumb,
-                "11",
-                "SCROLL_BAR_THUMB",
-                "scrollbar.thumb"
-            )
-            val scrollbarThumbHover = pick(
-                fallback.scrollbarThumbHover,
-                "12",
-                "SCROLL_BAR_THUMB_PRESSED",
-                "scrollbar.thumbHover"
-            )
-
-            val syntaxKeyword = pick(fallback.syntax.keyword, "21", "KEYWORD", EditorThemeColorKey.SYNTAX_KEYWORD.wireName)
-            val syntaxComment = pick(fallback.syntax.comment, "22", "COMMENT", EditorThemeColorKey.SYNTAX_COMMENT.wireName)
-            val syntaxOperator = pick(fallback.syntax.operator, "23", "OPERATOR", EditorThemeColorKey.SYNTAX_OPERATOR.wireName)
-            val syntaxLiteral = pick(fallback.syntax.string, "24", "LITERAL", EditorThemeColorKey.SYNTAX_STRING.wireName)
-            val syntaxVariable = pick(fallback.syntax.variable, "25", "IDENTIFIER_VAR", EditorThemeColorKey.SYNTAX_VARIABLE.wireName)
-            val syntaxProperty = parse(EditorThemeColorKey.SYNTAX_PROPERTY.wireName) ?: syntaxVariable
-            val syntaxType = pick(fallback.syntax.type, "26", "IDENTIFIER_NAME", EditorThemeColorKey.SYNTAX_TYPE.wireName)
-            val syntaxFunction = pick(fallback.syntax.function, "27", "FUNCTION_NAME", EditorThemeColorKey.SYNTAX_FUNCTION.wireName)
-            val syntaxNumber = pick(fallback.syntax.number, "24", "LITERAL", EditorThemeColorKey.SYNTAX_NUMBER.wireName)
-            val syntaxPunctuation = pick(fallback.syntax.punctuation, "23", "OPERATOR", EditorThemeColorKey.SYNTAX_PUNCTUATION.wireName)
-            val syntaxConstant = pick(fallback.syntax.constant, EditorThemeColorKey.SYNTAX_CONSTANT.wireName)
-            val syntaxBuiltin = pick(fallback.syntax.builtin, EditorThemeColorKey.SYNTAX_BUILTIN.wireName)
-            val syntaxDeprecated = pick(fallback.syntax.deprecated, EditorThemeColorKey.SYNTAX_DEPRECATED.wireName)
-
-            val rainbowColors = (0 until 6).map { index ->
-                parse("rainbowBrackets.$index")
-                    ?: parse("${256 + index}")
-                    ?: fallback.rainbowBracketColors.getOrElse(index) {
-                        DEFAULT_RAINBOW_BRACKET_COLORS[index]
-                    }
-            }
+            fun color(key: EditorThemeColorKey, default: Color): Color =
+                parseColorOrNull(colors[key.wireName]) ?: default
 
             return fallback.copy(
-                rainbowBracketColors = rainbowColors,
-                bracketPairGuide = pick(
-                    fallback.bracketPairGuide,
-                    EditorThemeColorKey.BRACKET_PAIR_GUIDE.wireName
-                ),
-                bracketPairGuideActive = pick(
-                    fallback.bracketPairGuideActive,
-                    EditorThemeColorKey.BRACKET_PAIR_GUIDE_ACTIVE.wireName
-                ),
-                whitespace = pick(
-                    fallback.whitespace,
-                    EditorThemeColorKey.EDITOR_WHITESPACE.wireName
-                ),
-                background = background,
-                foreground = foreground,
-                lineNumberBackground = gutterBackground,
-                gutterBackground = gutterBackground,
-                gutterDivider = gutterDivider,
-                lineNumberForeground = lineNumberForeground,
-                lineNumberForegroundActive = lineNumberForegroundActive,
-                selectionBackground = selectionBackground,
-                currentLineBackground = currentLineBackground,
-                cursor = cursor,
-                selectionHandle = selectionHandle,
-                scrollbarTrack = scrollbarTrack,
-                scrollbarThumb = scrollbarThumb,
-                scrollbarThumbHover = scrollbarThumbHover,
-                breakpoint = pick(
-                    fallback.breakpoint,
-                    "gutter.breakpoint",
-                    "breakpoint",
-                    "35",
-                    "PROBLEM_ERROR"
-                ),
-                bookmark = pick(
-                    fallback.bookmark,
-                    "gutter.bookmark",
-                    "bookmark"
-                ),
-                gutterDiagnostic = pick(
-                    fallback.gutterDiagnostic,
-                    "gutter.diagnostic",
-                    "gutterDiagnostic",
-                    "36",
-                    "PROBLEM_WARNING"
-                ),
-                gitAdded = pick(
-                    fallback.gitAdded,
-                    "gutter.gitAdded",
-                    "git.added"
-                ),
-                gitModified = pick(
-                    fallback.gitModified,
-                    "gutter.gitModified",
-                    "git.modified"
-                ),
-                gitDeleted = pick(
-                    fallback.gitDeleted,
-                    "gutter.gitDeleted",
-                    "git.deleted"
-                ),
-                foldIconExpanded = pick(
-                    fallback.foldIconExpanded,
-                    "folding.iconExpanded",
-                    "folding.icon",
-                    "foldIconExpanded",
-                    "81",
-                    "FOLDING_ICON"
-                ),
-                foldIconCollapsed = pick(
-                    fallback.foldIconCollapsed,
-                    "folding.iconCollapsed",
-                    "foldIconCollapsed"
-                ),
-                foldIconWarning = pick(
-                    fallback.foldIconWarning,
-                    "folding.iconWarning",
-                    "foldIconWarning",
-                    "36",
-                    "PROBLEM_WARNING"
-                ),
-                diagnosticError = pick(
-                    fallback.diagnosticError,
-                    EditorThemeColorKey.DIAGNOSTIC_ERROR.wireName,
-                    "problem.error",
-                    "35",
-                    "PROBLEM_ERROR"
-                ),
-                diagnosticWarning = pick(
-                    fallback.diagnosticWarning,
-                    EditorThemeColorKey.DIAGNOSTIC_WARNING.wireName,
-                    "problem.warning",
-                    "36",
-                    "PROBLEM_WARNING"
-                ),
-                diagnosticInfo = pick(
-                    fallback.diagnosticInfo,
-                    EditorThemeColorKey.DIAGNOSTIC_INFO.wireName,
-                    "problem.info"
-                ),
-                diagnosticHint = pick(
-                    fallback.diagnosticHint,
-                    EditorThemeColorKey.DIAGNOSTIC_HINT.wireName,
-                    "problem.hint",
-                    "37",
-                    "PROBLEM_TYPO"
-                ),
+                background = color(EditorThemeColorKey.EDITOR_BACKGROUND, fallback.background),
+                foreground = color(EditorThemeColorKey.EDITOR_FOREGROUND, fallback.foreground),
+                lineNumberBackground = color(EditorThemeColorKey.EDITOR_LINE_NUMBER_BACKGROUND, fallback.lineNumberBackground),
+                gutterBackground = color(EditorThemeColorKey.GUTTER_BACKGROUND, fallback.gutterBackground),
+                gutterDivider = color(EditorThemeColorKey.GUTTER_DIVIDER, fallback.gutterDivider),
+                lineNumberForeground = color(EditorThemeColorKey.EDITOR_LINE_NUMBER, fallback.lineNumberForeground),
+                lineNumberForegroundActive = color(EditorThemeColorKey.EDITOR_LINE_NUMBER_ACTIVE, fallback.lineNumberForegroundActive),
+                selectionBackground = color(EditorThemeColorKey.EDITOR_SELECTION, fallback.selectionBackground),
+                currentLineBackground = color(EditorThemeColorKey.EDITOR_CURSOR_LINE, fallback.currentLineBackground),
+                cursor = color(EditorThemeColorKey.EDITOR_CURSOR, fallback.cursor),
+                selectionHandle = color(EditorThemeColorKey.EDITOR_SELECTION_HANDLE, fallback.selectionHandle),
+                scrollbarTrack = color(EditorThemeColorKey.SCROLLBAR_TRACK, fallback.scrollbarTrack),
+                scrollbarThumb = color(EditorThemeColorKey.SCROLLBAR_THUMB, fallback.scrollbarThumb),
+                scrollbarThumbHover = color(EditorThemeColorKey.SCROLLBAR_THUMB_HOVER, fallback.scrollbarThumbHover),
+                breakpoint = color(EditorThemeColorKey.GUTTER_BREAKPOINT, fallback.breakpoint),
+                bookmark = color(EditorThemeColorKey.GUTTER_BOOKMARK, fallback.bookmark),
+                gutterDiagnostic = color(EditorThemeColorKey.GUTTER_DIAGNOSTIC, fallback.gutterDiagnostic),
+                gitAdded = color(EditorThemeColorKey.GUTTER_GIT_ADDED, fallback.gitAdded),
+                gitModified = color(EditorThemeColorKey.GUTTER_GIT_MODIFIED, fallback.gitModified),
+                gitDeleted = color(EditorThemeColorKey.GUTTER_GIT_DELETED, fallback.gitDeleted),
+                foldIconExpanded = color(EditorThemeColorKey.FOLDING_ICON_EXPANDED, fallback.foldIconExpanded),
+                foldIconCollapsed = color(EditorThemeColorKey.FOLDING_ICON_COLLAPSED, fallback.foldIconCollapsed),
+                foldIconWarning = color(EditorThemeColorKey.FOLDING_ICON_WARNING, fallback.foldIconWarning),
+                foldPlaceholderForeground = color(EditorThemeColorKey.FOLDING_PLACEHOLDER_FOREGROUND, fallback.foldPlaceholderForeground),
+                foldPlaceholderBackground = color(EditorThemeColorKey.FOLDING_PLACEHOLDER_BACKGROUND, fallback.foldPlaceholderBackground),
+                diagnosticError = color(EditorThemeColorKey.DIAGNOSTIC_ERROR, fallback.diagnosticError),
+                diagnosticWarning = color(EditorThemeColorKey.DIAGNOSTIC_WARNING, fallback.diagnosticWarning),
+                diagnosticInfo = color(EditorThemeColorKey.DIAGNOSTIC_INFO, fallback.diagnosticInfo),
+                diagnosticHint = color(EditorThemeColorKey.DIAGNOSTIC_HINT, fallback.diagnosticHint),
+                bracketPairGuide = color(EditorThemeColorKey.BRACKET_PAIR_GUIDE, fallback.bracketPairGuide),
+                bracketPairGuideActive = color(EditorThemeColorKey.BRACKET_PAIR_GUIDE_ACTIVE, fallback.bracketPairGuideActive),
+                whitespace = color(EditorThemeColorKey.EDITOR_WHITESPACE, fallback.whitespace),
+                findMatchBackground = color(EditorThemeColorKey.EDITOR_FIND_MATCH, fallback.findMatchBackground),
+                findMatchActiveBackground = color(EditorThemeColorKey.EDITOR_FIND_MATCH_ACTIVE, fallback.findMatchActiveBackground),
+                rainbowBracketColors = (0 until 6).map { index ->
+                    parseColorOrNull(colors["rainbowBrackets.$index"])
+                        ?: fallback.rainbowBracketColors.getOrElse(index) { DEFAULT_RAINBOW_BRACKET_COLORS[index] }
+                },
                 syntax = fallback.syntax.copy(
-                    defaultText = foreground,
-                    keyword = syntaxKeyword,
-                    function = syntaxFunction,
-                    variable = syntaxVariable,
-                    property = syntaxProperty,
-                    type = syntaxType,
-                    string = syntaxLiteral,
-                    number = syntaxNumber,
-                    comment = syntaxComment,
-                    operator = syntaxOperator,
-                    punctuation = syntaxPunctuation,
-                    constant = syntaxConstant,
-                    builtin = syntaxBuiltin,
-                    deprecated = syntaxDeprecated
+                    defaultText = color(EditorThemeColorKey.EDITOR_FOREGROUND, fallback.foreground),
+                    keyword = color(EditorThemeColorKey.SYNTAX_KEYWORD, fallback.syntax.keyword),
+                    function = color(EditorThemeColorKey.SYNTAX_FUNCTION, fallback.syntax.function),
+                    variable = color(EditorThemeColorKey.SYNTAX_VARIABLE, fallback.syntax.variable),
+                    property = color(EditorThemeColorKey.SYNTAX_PROPERTY, fallback.syntax.property),
+                    type = color(EditorThemeColorKey.SYNTAX_TYPE, fallback.syntax.type),
+                    string = color(EditorThemeColorKey.SYNTAX_STRING, fallback.syntax.string),
+                    number = color(EditorThemeColorKey.SYNTAX_NUMBER, fallback.syntax.number),
+                    comment = color(EditorThemeColorKey.SYNTAX_COMMENT, fallback.syntax.comment),
+                    operator = color(EditorThemeColorKey.SYNTAX_OPERATOR, fallback.syntax.operator),
+                    punctuation = color(EditorThemeColorKey.SYNTAX_PUNCTUATION, fallback.syntax.punctuation),
+                    constant = color(EditorThemeColorKey.SYNTAX_CONSTANT, fallback.syntax.constant),
+                    builtin = color(EditorThemeColorKey.SYNTAX_BUILTIN, fallback.syntax.builtin),
+                    deprecated = color(EditorThemeColorKey.SYNTAX_DEPRECATED, fallback.syntax.deprecated),
                 )
             )
         }
@@ -476,7 +274,6 @@ data class EditorColorScheme(
         private fun parseColorOrNull(value: String?): Color? {
             val raw = value?.trim().orEmpty()
             if (raw.isEmpty()) return null
-            if (raw == "0") return null
             val normalized = when {
                 raw.startsWith("0x", ignoreCase = true) -> "#${raw.drop(2)}"
                 else -> raw
@@ -490,21 +287,41 @@ data class EditorColorScheme(
     fun toThemeColors(): Map<String, String> = buildMap {
         put(EditorThemeColorKey.EDITOR_BACKGROUND.wireName, background.toThemeHex())
         put(EditorThemeColorKey.EDITOR_FOREGROUND.wireName, foreground.toThemeHex())
+        put(EditorThemeColorKey.EDITOR_LINE_NUMBER_BACKGROUND.wireName, lineNumberBackground.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_BACKGROUND.wireName, gutterBackground.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_DIVIDER.wireName, gutterDivider.toThemeHex())
+        put(EditorThemeColorKey.EDITOR_LINE_NUMBER.wireName, lineNumberForeground.toThemeHex())
+        put(EditorThemeColorKey.EDITOR_LINE_NUMBER_ACTIVE.wireName, lineNumberForegroundActive.toThemeHex())
         put(EditorThemeColorKey.EDITOR_SELECTION.wireName, selectionBackground.toThemeHex())
         put(EditorThemeColorKey.EDITOR_CURSOR_LINE.wireName, currentLineBackground.toThemeHex())
         put(EditorThemeColorKey.EDITOR_CURSOR.wireName, cursor.toThemeHex())
-        put(EditorThemeColorKey.EDITOR_LINE_NUMBER.wireName, lineNumberForeground.toThemeHex())
-        put(EditorThemeColorKey.EDITOR_LINE_NUMBER_ACTIVE.wireName, lineNumberForegroundActive.toThemeHex())
-        put(EditorThemeColorKey.GUTTER_BACKGROUND.wireName, gutterBackground.toThemeHex())
-        put(EditorThemeColorKey.GUTTER_DIVIDER.wireName, gutterDivider.toThemeHex())
-        put(EditorThemeColorKey.EDITOR_WHITESPACE.wireName, whitespace.toThemeHex())
+        put(EditorThemeColorKey.EDITOR_SELECTION_HANDLE.wireName, selectionHandle.toThemeHex())
+        put(EditorThemeColorKey.SCROLLBAR_TRACK.wireName, scrollbarTrack.toThemeHex())
+        put(EditorThemeColorKey.SCROLLBAR_THUMB.wireName, scrollbarThumb.toThemeHex())
+        put(EditorThemeColorKey.SCROLLBAR_THUMB_HOVER.wireName, scrollbarThumbHover.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_BREAKPOINT.wireName, breakpoint.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_BOOKMARK.wireName, bookmark.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_DIAGNOSTIC.wireName, gutterDiagnostic.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_GIT_ADDED.wireName, gitAdded.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_GIT_MODIFIED.wireName, gitModified.toThemeHex())
+        put(EditorThemeColorKey.GUTTER_GIT_DELETED.wireName, gitDeleted.toThemeHex())
+        put(EditorThemeColorKey.FOLDING_ICON_EXPANDED.wireName, foldIconExpanded.toThemeHex())
+        put(EditorThemeColorKey.FOLDING_ICON_COLLAPSED.wireName, foldIconCollapsed.toThemeHex())
+        put(EditorThemeColorKey.FOLDING_ICON_WARNING.wireName, foldIconWarning.toThemeHex())
+        put(EditorThemeColorKey.FOLDING_PLACEHOLDER_FOREGROUND.wireName, foldPlaceholderForeground.toThemeHex())
+        put(EditorThemeColorKey.FOLDING_PLACEHOLDER_BACKGROUND.wireName, foldPlaceholderBackground.toThemeHex())
+        put(EditorThemeColorKey.DIAGNOSTIC_ERROR.wireName, diagnosticError.toThemeHex())
+        put(EditorThemeColorKey.DIAGNOSTIC_WARNING.wireName, diagnosticWarning.toThemeHex())
+        put(EditorThemeColorKey.DIAGNOSTIC_INFO.wireName, diagnosticInfo.toThemeHex())
+        put(EditorThemeColorKey.DIAGNOSTIC_HINT.wireName, diagnosticHint.toThemeHex())
         put(EditorThemeColorKey.BRACKET_PAIR_GUIDE.wireName, bracketPairGuide.toThemeHex())
         put(EditorThemeColorKey.BRACKET_PAIR_GUIDE_ACTIVE.wireName, bracketPairGuideActive.toThemeHex())
-        EditorThemeColorKey.entries
-            .filter { it.wireName.startsWith("rainbowBrackets.") }
-            .forEachIndexed { index, key ->
-                rainbowBracketColors.getOrNull(index)?.let { put(key.wireName, it.toThemeHex()) }
-            }
+        put(EditorThemeColorKey.EDITOR_WHITESPACE.wireName, whitespace.toThemeHex())
+        put(EditorThemeColorKey.EDITOR_FIND_MATCH.wireName, findMatchBackground.toThemeHex())
+        put(EditorThemeColorKey.EDITOR_FIND_MATCH_ACTIVE.wireName, findMatchActiveBackground.toThemeHex())
+        rainbowBracketColors.take(6).forEachIndexed { index, color ->
+            put("rainbowBrackets.$index", color.toThemeHex())
+        }
         put(EditorThemeColorKey.SYNTAX_KEYWORD.wireName, syntax.keyword.toThemeHex())
         put(EditorThemeColorKey.SYNTAX_FUNCTION.wireName, syntax.function.toThemeHex())
         put(EditorThemeColorKey.SYNTAX_VARIABLE.wireName, syntax.variable.toThemeHex())
@@ -518,10 +335,6 @@ data class EditorColorScheme(
         put(EditorThemeColorKey.SYNTAX_CONSTANT.wireName, syntax.constant.toThemeHex())
         put(EditorThemeColorKey.SYNTAX_BUILTIN.wireName, syntax.builtin.toThemeHex())
         put(EditorThemeColorKey.SYNTAX_DEPRECATED.wireName, syntax.deprecated.toThemeHex())
-        put(EditorThemeColorKey.DIAGNOSTIC_ERROR.wireName, diagnosticError.toThemeHex())
-        put(EditorThemeColorKey.DIAGNOSTIC_WARNING.wireName, diagnosticWarning.toThemeHex())
-        put(EditorThemeColorKey.DIAGNOSTIC_INFO.wireName, diagnosticInfo.toThemeHex())
-        put(EditorThemeColorKey.DIAGNOSTIC_HINT.wireName, diagnosticHint.toThemeHex())
     }
 }
 

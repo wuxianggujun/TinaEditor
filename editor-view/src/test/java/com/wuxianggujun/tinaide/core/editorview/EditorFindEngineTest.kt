@@ -46,4 +46,23 @@ class EditorFindEngineTest {
         assertThat(EditorFindEngine.scan("foo", "foo", EditorFindOptions(), "$1\\x").edits)
             .containsExactly(EditorTextEdit(0, 3, "$1\\x"))
     }
+
+    @Test(timeout = 2000) fun regexCannotCatastrophicallyBacktrack() {
+        val result = EditorFindEngine.scan("a".repeat(100_000) + "!", "(a+)+$", EditorFindOptions(regex = true))
+        assertThat(result.error).isNull()
+        assertThat(result.matches).isEmpty()
+    }
+
+    @Test fun unsupportedRegexIsAnErrorWithoutPartialEdits() {
+        for (query in listOf("(?<=a)b", "(a)\\1")) {
+            val result = EditorFindEngine.scan("aab", query, EditorFindOptions(regex = true), "x")
+            assertThat(result.error).isEqualTo(EditorFindError.InvalidQuery)
+            assertThat(result.edits).isEmpty()
+        }
+    }
+
+    @Test fun escapedRegexReplacementInsertsLiteralDollars() {
+        assertThat(EditorFindEngine.scan("a a", "a", EditorFindOptions(regex = true), "\\$1").edits)
+            .containsExactly(EditorTextEdit(0, 1, "$1"), EditorTextEdit(2, 3, "$1")).inOrder()
+    }
 }

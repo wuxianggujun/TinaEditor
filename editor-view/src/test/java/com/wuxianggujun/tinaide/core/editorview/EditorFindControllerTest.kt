@@ -2,7 +2,6 @@ package com.wuxianggujun.tinaide.core.editorview
 
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
-import com.wuxianggujun.tinaide.core.textengine.TextChangeListener
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -66,8 +65,6 @@ class EditorFindControllerTest {
 
     private fun state(text: String): EditorState {
         val buffer = RopeTextBuffer().apply { insert(0, text) }
-        return EditorState(buffer).also { state ->
-            buffer.addChangeListener(TextChangeListener(state::applyTextBufferChange))
-        }
+        return EditorState(buffer)
     }
 }

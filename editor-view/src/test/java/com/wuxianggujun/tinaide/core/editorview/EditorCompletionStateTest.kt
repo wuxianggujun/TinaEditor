@@ -25,14 +25,14 @@ class EditorCompletionStateTest {
             )
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.showCompletion).isTrue()
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.showCompletion).isTrue()
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("print", "private")
             .inOrder()
-        assertThat(state.completionSelectedIndex).isEqualTo(0)
-        assertThat(state.completionQuery).isEqualTo("pri")
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(0)
+        assertThat(state.completion.completionQuery).isEqualTo("pri")
     }
 
     @Test
@@ -46,11 +46,11 @@ class EditorCompletionStateTest {
             )
         )
 
-        state.moveCompletionSelection(-1)
-        assertThat(state.completionSelectedIndex).isEqualTo(2)
+        state.completion.moveCompletionSelection(-1)
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(2)
 
-        state.moveCompletionSelection(1)
-        assertThat(state.completionSelectedIndex).isEqualTo(0)
+        state.completion.moveCompletionSelection(1)
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(0)
     }
 
     @Test
@@ -66,12 +66,12 @@ class EditorCompletionStateTest {
             selectedIndex = 1
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo("private")
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.completionItems).isEmpty()
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.completionItems).isEmpty()
     }
 
     @Test
@@ -96,12 +96,12 @@ class EditorCompletionStateTest {
             query = "vec"
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo("std::vector")
         assertThat(state.cursorOffset).isEqualTo(11) // "std::vector" length
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
     }
 
     @Test
@@ -127,12 +127,12 @@ class EditorCompletionStateTest {
             query = "o"
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo("operator")
         assertThat(state.cursorOffset).isEqualTo("operator".length)
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
     }
 
     @Test
@@ -158,12 +158,12 @@ class EditorCompletionStateTest {
             query = "x"
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo("xp")
         assertThat(state.cursorOffset).isEqualTo(2)
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
     }
 
     @Test
@@ -189,12 +189,12 @@ class EditorCompletionStateTest {
             query = "x"
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo("xp")
         assertThat(state.cursorOffset).isEqualTo(1)
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
     }
 
     @Test
@@ -220,12 +220,12 @@ class EditorCompletionStateTest {
             query = "o"
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo("op\n")
         assertThat(state.cursorOffset).isEqualTo(buffer.positionToOffset(1, 0))
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
     }
 
     @Test
@@ -252,12 +252,12 @@ class EditorCompletionStateTest {
             query = "o"
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo("operator")
         assertThat(state.cursorOffset).isEqualTo("operator".length)
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
     }
 
     @Test
@@ -296,14 +296,14 @@ class EditorCompletionStateTest {
             )
         )
 
-        val applied = state.applySelectedCompletion()
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length)).isEqualTo(completedText)
         // cursor at "printf" end = line 2 col 10
         val cursorAfter = state.textBuffer.positionToOffset(2, 10)
         assertThat(state.cursorOffset).isEqualTo(cursorAfter)
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
 
         assertThat(state.undo()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo(originalText)
@@ -348,11 +348,11 @@ class EditorCompletionStateTest {
             )
         )
 
-        assertThat(state.applySelectedCompletion()).isTrue()
+        assertThat(state.completion.applySelectedCompletion()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo(completedText)
         val cursorAfter = state.textBuffer.positionToOffset(2, 16)
         assertThat(state.cursorOffset).isEqualTo(cursorAfter)
-        assertThat(state.activeSnippetSession).isNotNull()
+        assertThat(state.completion.activeSnippetSession).isNotNull()
 
         assertThat(state.undo()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo(originalText)
@@ -380,10 +380,10 @@ class EditorCompletionStateTest {
             )
         )
 
-        assertThat(state.applySelectedCompletion()).isTrue()
+        assertThat(state.completion.applySelectedCompletion()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo(originalText)
         assertThat(state.cursorOffset).isEqualTo(originalText.length)
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
         assertThat(state.textBuffer.canUndo()).isFalse()
     }
 
@@ -404,10 +404,10 @@ class EditorCompletionStateTest {
             )
         )
 
-        assertThat(state.applySelectedCompletion()).isTrue()
+        assertThat(state.completion.applySelectedCompletion()).isTrue()
         assertThat(state.textBuffer.toString()).isEqualTo(originalText)
         assertThat(state.cursorOffset).isEqualTo(originalText.length)
-        assertThat(state.showCompletion).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
         assertThat(state.textBuffer.canUndo()).isFalse()
     }
 
@@ -419,12 +419,12 @@ class EditorCompletionStateTest {
             query = "hel"
         )
 
-        state.dismissCompletion()
+        state.completion.dismissCompletion()
 
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.completionItems).isEmpty()
-        assertThat(state.completionSelectedIndex).isEqualTo(-1)
-        assertThat(state.completionQuery).isEmpty()
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.completionItems).isEmpty()
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(-1)
+        assertThat(state.completion.completionQuery).isEmpty()
     }
 
     @Test
@@ -443,14 +443,14 @@ class EditorCompletionStateTest {
             EditorCompletionFetchResult.TransientFailure("lsp_timeout")
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.showCompletion).isTrue()
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.showCompletion).isTrue()
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("print", "private")
             .inOrder()
-        assertThat(state.completionSelectedIndex).isEqualTo(0)
-        assertThat(state.completionQuery).isEqualTo("pri")
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(0)
+        assertThat(state.completion.completionQuery).isEqualTo("pri")
     }
 
     @Test
@@ -468,12 +468,12 @@ class EditorCompletionStateTest {
             EditorCompletionFetchResult.TransientFailure("lsp_timeout")
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.completionItems).isEmpty()
-        assertThat(state.completionSelectedIndex).isEqualTo(-1)
-        assertThat(state.completionQuery).isEqualTo("xyz")
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.completionItems).isEmpty()
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(-1)
+        assertThat(state.completion.completionQuery).isEqualTo("xyz")
     }
 
     @Test
@@ -500,13 +500,13 @@ class EditorCompletionStateTest {
             )
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("print", "println", "private")
             .inOrder()
-        assertThat(state.completionSelectedIndex).isEqualTo(2)
-        assertThat(state.completionItems[state.completionSelectedIndex].label).isEqualTo("private")
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(2)
+        assertThat(state.completion.completionItems[state.completion.completionSelectedIndex].label).isEqualTo("private")
     }
 
     @Test
@@ -526,25 +526,25 @@ class EditorCompletionStateTest {
         state.onRequestCompletion = { _, _ -> response.await() }
 
         val requestJob = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
-            state.requestCompletion()
+            state.completion.requestCompletion()
         }
 
-        val loadingState = state.completionUiState as CompletionUiState.Loading
+        val loadingState = state.completion.completionUiState as CompletionUiState.Loading
         assertThat(loadingState.previousItems.map { it.label })
             .containsExactly("print", "private", "protected")
             .inOrder()
         assertThat(loadingState.query).isEqualTo("pri")
         assertThat(loadingState.selectedIndex).isEqualTo(1)
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("print", "private", "protected")
             .inOrder()
-        assertThat(state.completionQuery).isEqualTo("pri")
-        assertThat(state.completionSelectedIndex).isEqualTo(1)
+        assertThat(state.completion.completionQuery).isEqualTo("pri")
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(1)
 
-        assertThat(state.moveCompletionSelection(1)).isTrue()
-        val updatedLoadingState = state.completionUiState as CompletionUiState.Loading
+        assertThat(state.completion.moveCompletionSelection(1)).isTrue()
+        val updatedLoadingState = state.completion.completionUiState as CompletionUiState.Loading
         assertThat(updatedLoadingState.selectedIndex).isEqualTo(2)
-        assertThat(state.completionSelectedIndex).isEqualTo(2)
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(2)
 
         response.complete(EditorCompletionFetchResult.TransientFailure("timeout"))
         requestJob.join()
@@ -574,11 +574,11 @@ class EditorCompletionStateTest {
             )
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.completionItems.map { it.label })
             .containsAtLeast("int", "INT16_C", "INT32_C")
-        assertThat(state.completionItems.first().label).isEqualTo("int")
+        assertThat(state.completion.completionItems.first().label).isEqualTo("int")
     }
 
     @Test
@@ -608,9 +608,9 @@ class EditorCompletionStateTest {
             )
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("int")
     }
 
@@ -638,9 +638,9 @@ class EditorCompletionStateTest {
             )
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("int")
     }
 
@@ -670,9 +670,9 @@ class EditorCompletionStateTest {
             )
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("int", "intValue")
             .inOrder()
     }
@@ -699,10 +699,10 @@ class EditorCompletionStateTest {
             )
         }
 
-        state.requestCompletion()
+        state.completion.requestCompletion()
 
-        assertThat(state.completionItems).hasSize(2)
-        assertThat(state.completionItems.map { it.detail })
+        assertThat(state.completion.completionItems).hasSize(2)
+        assertThat(state.completion.completionItems.map { it.detail })
             .containsExactly(
                 "printf(const char* format, ...)",
                 "printf(const wchar_t* format, ...)"

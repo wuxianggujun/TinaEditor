@@ -2,7 +2,8 @@ package com.wuxianggujun.tinaide.core.editorview
 
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
-import com.wuxianggujun.tinaide.core.textengine.TextChange
+import com.wuxianggujun.tinaide.core.textengine.TextBuffer
+import com.wuxianggujun.tinaide.core.textengine.TextChangeListener
 import java.util.concurrent.Executor
 import org.junit.Test
 
@@ -15,7 +16,6 @@ class EditorStateInlayHintsTest {
         state.replaceInlayHintsInLines(0..0, listOf(hint), buffer.version)
         val hintsByLine = state.inlayHintsByLine
         val layoutGeneration = state.inlayHintsVersion
-        buffer.addChangeListener(state::applyTextBufferChange)
 
         repeat(4) {
             buffer.insert(buffer.length, "x")
@@ -32,7 +32,6 @@ class EditorStateInlayHintsTest {
         val state = EditorState(buffer)
         val hints = List(3) { EditorInlayHint(it, 5, "value:") }
         state.replaceInlayHintsInLines(0..2, hints, buffer.version)
-        buffer.addChangeListener(state::applyTextBufferChange)
 
         buffer.insert(buffer.positionToOffset(1, 5), "2")
 
@@ -47,7 +46,6 @@ class EditorStateInlayHintsTest {
         val top = EditorInlayHint(0, 5, "first:")
         val bottom = EditorInlayHint(2, 5, "second:")
         state.replaceInlayHintsInLines(0..2, listOf(top, bottom), buffer.version)
-        buffer.addChangeListener(state::applyTextBufferChange)
         val editOffset = buffer.positionToOffset(1, 2)
 
         buffer.insert(editOffset, "\n\n")
@@ -66,7 +64,6 @@ class EditorStateInlayHintsTest {
         val hint = EditorInlayHint(0, 5, "value:")
         state.replaceInlayHintsInLines(0..0, listOf(hint), buffer.version)
         val layoutGeneration = state.inlayHintsVersion
-        buffer.addChangeListener(state::applyTextBufferChange)
         buffer.insert(buffer.length, "x")
 
         assertThat(state.replaceInlayHintsInLines(0..1, listOf(hint), buffer.version)).isTrue()
@@ -80,7 +77,6 @@ class EditorStateInlayHintsTest {
         val hint = EditorInlayHint(1, 5, "value:")
         state.replaceInlayHintsInLines(0..1, listOf(hint), buffer.version)
         val requestedVersion = buffer.version
-        buffer.addChangeListener(state::applyTextBufferChange)
         buffer.insert(2, "\n")
 
         assertThat(state.replaceInlayHintsInLines(0..1, listOf(hint), requestedVersion)).isFalse()
@@ -95,8 +91,7 @@ class EditorStateInlayHintsTest {
         val hint = EditorInlayHint(1, 5, "value:")
         state.replaceInlayHintsInLines(0..1, listOf(hint), buffer.version)
         val observedHintVersions = mutableListOf<Long>()
-        buffer.addChangeListener { change ->
-            state.applyTextBufferChange(change)
+        buffer.addChangeListener {
             observedHintVersions += state.inlayHintsDocumentVersion
         }
 
@@ -115,7 +110,6 @@ class EditorStateInlayHintsTest {
         val state = EditorState(buffer)
         val hints = List(4) { EditorInlayHint(it, 1, "hint-$it") }
         state.replaceInlayHintsInLines(0..3, hints, buffer.version)
-        buffer.addChangeListener(state::applyTextBufferChange)
 
         buffer.replace(buffer.positionToOffset(1, 1), buffer.positionToOffset(2, 3), "x")
 
@@ -126,14 +120,16 @@ class EditorStateInlayHintsTest {
     @Test
     fun missingChange_shouldDiscardHintsRatherThanGuessTheirPositions() {
         val buffer = RopeTextBuffer("edit\ncall(1)")
-        val state = EditorState(buffer)
+        var subscriber: TextChangeListener? = null
+        val droppingBuffer = object : TextBuffer by buffer {
+            override fun addChangeListener(listener: TextChangeListener) { subscriber = listener }
+            override fun removeChangeListener(listener: TextChangeListener) { if (subscriber === listener) subscriber = null }
+        }
+        buffer.addChangeListener { if (it.documentVersion > 1) subscriber?.onTextChanged(it) }
+        val state = EditorState(droppingBuffer)
         state.replaceInlayHintsInLines(0..1, listOf(EditorInlayHint(1, 5, "value:")), buffer.version)
-        val changes = mutableListOf<TextChange>()
-        buffer.addChangeListener { changes += it }
         buffer.insert(2, "\n")
         buffer.insert(2, "\n")
-
-        state.applyTextBufferChange(changes.last())
 
         assertThat(state.inlayHints).isEmpty()
         assertThat(state.inlayHintsDocumentVersion).isEqualTo(-1L)
@@ -144,7 +140,6 @@ class EditorStateInlayHintsTest {
         val tasks = ArrayDeque<Runnable>()
         val buffer = RopeTextBuffer("edit\ncall(1)", changeExecutor = Executor { tasks.addLast(it) })
         val state = EditorState(buffer)
-        buffer.addChangeListener(state::applyTextBufferChange)
         buffer.insert(2, "\n")
         buffer.insert(2, "\n")
         val currentHint = EditorInlayHint(3, 5, "value:")
@@ -165,7 +160,6 @@ class EditorStateInlayHintsTest {
         val top = EditorInlayHint(0, 1, "top:")
         val bottom = EditorInlayHint(2, 1, "bottom:")
         state.replaceInlayHintsInLines(0..2, listOf(top, bottom), buffer.version)
-        buffer.addChangeListener(state::applyTextBufferChange)
         buffer.insert(buffer.positionToOffset(1, 2), "x")
 
         assertThat(state.replaceInlayHintsInLines(0..1, emptyList(), buffer.version)).isTrue()
@@ -179,7 +173,6 @@ class EditorStateInlayHintsTest {
         state.replaceInlayHintsInLines(0..0, listOf(EditorInlayHint(0, 5, "value:")), buffer.version)
         state.clearInlayHints()
         val layoutGeneration = state.inlayHintsVersion
-        buffer.addChangeListener(state::applyTextBufferChange)
 
         buffer.insert(buffer.length, "x")
 
@@ -231,7 +224,7 @@ class EditorStateInlayHintsTest {
     }
 
     @Test
-    fun applyTextBufferChange_shouldDiscardHintsOnEditedLine() {
+    fun bufferChange_shouldDiscardHintsOnEditedLine() {
         val buffer = RopeTextBuffer("call(1)")
         val state = EditorState(buffer)
         state.replaceInlayHintsInLines(
@@ -239,19 +232,7 @@ class EditorStateInlayHintsTest {
             hints = listOf(EditorInlayHint(0, 5, "value:", EditorInlayHintKind.PARAMETER)),
             documentVersion = buffer.version,
         )
-        val change = TextChange(
-            startOffset = 5,
-            endOffset = 5,
-            oldText = "",
-            newText = "2",
-            startLine = 0,
-            startColumn = 5,
-            endLine = 0,
-            endColumn = 5,
-        )
         buffer.insert(5, "2")
-
-        state.applyTextBufferChange(change)
 
         assertThat(state.inlayHints).isEmpty()
         assertThat(state.inlayHintsByLine).isEmpty()

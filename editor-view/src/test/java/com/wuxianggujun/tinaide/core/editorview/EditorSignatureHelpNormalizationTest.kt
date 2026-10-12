@@ -1,7 +1,7 @@
 package com.wuxianggujun.tinaide.core.editorview
 
 import com.google.common.truth.Truth.assertThat
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import org.junit.Test
 
 /**

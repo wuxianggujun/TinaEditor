@@ -1,7 +1,7 @@
 package com.wuxianggujun.tinaide.core.editorview
 
 import com.google.common.truth.Truth.assertThat
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
@@ -22,9 +22,9 @@ class EditorSignatureHelpStateTest {
             )
         }
 
-        state.requestSignatureHelp()
+        state.assistance.requestSignatureHelp()
 
-        val uiState = state.signatureHelpUiState
+        val uiState = state.assistance.signatureHelpUiState
         assertThat(uiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
         uiState as SignatureHelpUiState.Visible
         assertThat(uiState.result.signatures).containsExactly("print(String text, Int repeatCount)")
@@ -37,9 +37,9 @@ class EditorSignatureHelpStateTest {
         val state = EditorState(RopeTextBuffer())
         state.onRequestSignatureHelp = { null }
 
-        state.requestSignatureHelp()
+        state.assistance.requestSignatureHelp()
 
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
     }
 
     @Test
@@ -55,10 +55,10 @@ class EditorSignatureHelpStateTest {
             selectedIndex = 0
         )
 
-        state.dismissSignatureHelp()
+        state.assistance.dismissSignatureHelp()
 
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
-        assertThat(state.signatureHelpSelectedSignatureIndex).isNull()
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isNull()
     }
 
     @Test
@@ -77,17 +77,17 @@ class EditorSignatureHelpStateTest {
             requestId = 1L
         )
 
-        assertThat(state.resolveDisplayedSignatureHelpIndex((state.signatureHelpUiState as SignatureHelpUiState.Visible).result))
+        assertThat(state.assistance.resolveDisplayedSignatureHelpIndex((state.assistance.signatureHelpUiState as SignatureHelpUiState.Visible).result))
             .isEqualTo(1)
 
-        assertThat(state.cycleSignatureHelp(1)).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(2)
+        assertThat(state.assistance.cycleSignatureHelp(1)).isTrue()
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(2)
 
-        assertThat(state.cycleSignatureHelp(1)).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(0)
+        assertThat(state.assistance.cycleSignatureHelp(1)).isTrue()
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(0)
 
-        assertThat(state.cycleSignatureHelp(-1)).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(2)
+        assertThat(state.assistance.cycleSignatureHelp(-1)).isTrue()
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(2)
     }
 
     @Test
@@ -102,11 +102,11 @@ class EditorSignatureHelpStateTest {
             requestId = 1L
         )
 
-        assertThat(state.selectSignatureHelp(1)).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(1)
+        assertThat(state.assistance.selectSignatureHelp(1)).isTrue()
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(1)
 
-        assertThat(state.selectSignatureHelp(99)).isFalse()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(1)
+        assertThat(state.assistance.selectSignatureHelp(99)).isFalse()
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(1)
     }
 
     @Test
@@ -133,11 +133,11 @@ class EditorSignatureHelpStateTest {
             )
         }
 
-        state.requestSignatureHelp()
+        state.assistance.requestSignatureHelp()
 
-        val uiState = state.signatureHelpUiState
+        val uiState = state.assistance.signatureHelpUiState
         assertThat(uiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(0)
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(0)
         assertThat(resolveDisplayedSignaturePreview(state)).isEqualTo("String label")
     }
 
@@ -157,10 +157,10 @@ class EditorSignatureHelpStateTest {
             requestId = 2L
         )
 
-        assertThat(state.cycleSignatureHelp(1)).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(1)
-        assertThat(state.selectSignatureHelp(2)).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(2)
+        assertThat(state.assistance.cycleSignatureHelp(1)).isTrue()
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(1)
+        assertThat(state.assistance.selectSignatureHelp(2)).isTrue()
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(2)
     }
 
     @Test
@@ -181,10 +181,10 @@ class EditorSignatureHelpStateTest {
 
         assertThat(resolveDisplayedSignaturePreview(state)).isEqualTo("String label")
 
-        assertThat(state.cycleSignatureHelp(1)).isTrue()
+        assertThat(state.assistance.cycleSignatureHelp(1)).isTrue()
         assertThat(resolveDisplayedSignaturePreview(state)).isEqualTo("Boolean enabled")
 
-        assertThat(state.selectSignatureHelp(2)).isTrue()
+        assertThat(state.assistance.selectSignatureHelp(2)).isTrue()
         assertThat(resolveDisplayedSignaturePreview(state))
             .isEqualTo("Map<String, List<Int>> metadata")
     }
@@ -207,10 +207,10 @@ class EditorSignatureHelpStateTest {
 
         assertThat(resolveDisplayedSignaturePreview(state)).isEqualTo("String label")
 
-        assertThat(state.cycleSignatureHelp(1)).isTrue()
+        assertThat(state.assistance.cycleSignatureHelp(1)).isTrue()
         assertThat(resolveDisplayedSignaturePreview(state)).isEqualTo("Boolean enabled")
 
-        assertThat(state.selectSignatureHelp(2)).isTrue()
+        assertThat(state.assistance.selectSignatureHelp(2)).isTrue()
         assertThat(resolveDisplayedSignaturePreview(state))
             .isEqualTo("Map<String, List<Int>> metadata")
     }
@@ -222,22 +222,22 @@ class EditorSignatureHelpStateTest {
         var cancellationPropagated = false
 
         try {
-            state.requestSignatureHelp()
+            state.assistance.requestSignatureHelp()
         } catch (_: CancellationException) {
             cancellationPropagated = true
         }
 
         assertThat(cancellationPropagated).isTrue()
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
     }
 
     private fun resolveDisplayedSignaturePreview(state: EditorState): String? {
-        val result = when (val uiState = state.signatureHelpUiState) {
+        val result = when (val uiState = state.assistance.signatureHelpUiState) {
             is SignatureHelpUiState.Visible -> uiState.result
             is SignatureHelpUiState.Loading -> uiState.previousResult
             SignatureHelpUiState.Hidden -> return null
         } ?: return null
-        val displayedIndex = state.resolveDisplayedSignatureHelpIndex(result)
+        val displayedIndex = state.assistance.resolveDisplayedSignatureHelpIndex(result)
         return resolveSignatureActiveParameterPreview(
             signature = result.signatures[displayedIndex],
             activeParameter = result.activeParameter

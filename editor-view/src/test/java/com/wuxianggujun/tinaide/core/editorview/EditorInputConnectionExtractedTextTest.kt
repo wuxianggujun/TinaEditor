@@ -171,6 +171,8 @@ class EditorInputConnectionExtractedTextTest {
     fun hostRebindAndDispose_shouldCloseMonitorAndDetachOldHostCallbacks() = runTest {
         val buffer = ListenerCountingTextBuffer(RopeTextBuffer("content"))
         val state = EditorState(buffer)
+        // The document subscription belongs to state, not to the mounted input host.
+        assertThat(buffer.activeListenerCount).isEqualTo(1)
         val controller = EditorInteractionController(
             state = state,
             coroutineScope = this,
@@ -185,12 +187,12 @@ class EditorInputConnectionExtractedTextTest {
             ExtractedTextRequest().apply { token = 1 },
             InputConnection.GET_EXTRACTED_TEXT_MONITOR
         )
-        assertThat(buffer.activeListenerCount).isEqualTo(1)
+        assertThat(buffer.activeListenerCount).isEqualTo(2)
 
         val secondHost = EditorInputHostView(applicationContext())
         controller.bindInputHostView(secondHost)
 
-        assertThat(buffer.activeListenerCount).isEqualTo(0)
+        assertThat(buffer.activeListenerCount).isEqualTo(1)
         assertThat(firstHost.inputConnectionFactory).isNull()
         assertThat(firstHost.keyEventHandler).isNull()
         assertThat(firstHost.onInputConnectionDetached).isNull()
@@ -200,14 +202,16 @@ class EditorInputConnectionExtractedTextTest {
             ExtractedTextRequest().apply { token = 2 },
             InputConnection.GET_EXTRACTED_TEXT_MONITOR
         )
-        assertThat(buffer.activeListenerCount).isEqualTo(1)
+        assertThat(buffer.activeListenerCount).isEqualTo(2)
 
         controller.onDispose()
 
-        assertThat(buffer.activeListenerCount).isEqualTo(0)
+        assertThat(buffer.activeListenerCount).isEqualTo(1)
         assertThat(secondHost.inputConnectionFactory).isNull()
         assertThat(secondHost.keyEventHandler).isNull()
         assertThat(secondHost.onInputConnectionDetached).isNull()
+        state.close()
+        assertThat(buffer.activeListenerCount).isEqualTo(0)
     }
 
     private fun createState(text: String): EditorState {

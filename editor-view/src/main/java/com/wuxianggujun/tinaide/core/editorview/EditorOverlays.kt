@@ -204,7 +204,7 @@ internal fun EditorHoverOverlay(
     hoverContent: EditorHoverContent = ::PlainHoverContent
 ) {
     val state = session.state
-    val hoverState = state.hoverUiState
+    val hoverState = state.assistance.hoverUiState
     if (hoverState is HoverUiState.Hidden) return
 
     val ui = session.ui
@@ -298,7 +298,7 @@ internal fun EditorCompletionOverlay(
     session: TinaEditorSession
 ) {
     val state = session.state
-    val completionState = state.completionUiState
+    val completionState = state.completion.completionUiState
     val popupItems = when (completionState) {
         is CompletionUiState.Visible -> completionState.items
         is CompletionUiState.Loading -> completionState.previousItems
@@ -366,12 +366,12 @@ internal fun EditorCompletionOverlay(
         maxHeightPx = completionLayout.maxHeightPx,
         colorScheme = state.colorScheme,
         isLoading = completionState is CompletionUiState.Loading,
-        onSelectedIndexChange = { index -> state.setCompletionSelectedIndex(index) },
+        onSelectedIndexChange = { index -> state.completion.setCompletionSelectedIndex(index) },
         onSelect = { item ->
             session.interactionController.prepareForExternalEdit()
             state.applyCompletion(item)
         },
-        onDismiss = { state.dismissCompletion() }
+        onDismiss = { state.completion.dismissCompletion() }
     )
 }
 
@@ -380,7 +380,7 @@ internal fun EditorSignatureHelpOverlay(
     session: TinaEditorSession
 ) {
     val state = session.state
-    val signatureState = state.signatureHelpUiState
+    val signatureState = state.assistance.signatureHelpUiState
     if (signatureState is SignatureHelpUiState.Hidden) return
 
     val resolvedResult = when (signatureState) {
@@ -399,7 +399,7 @@ internal fun EditorSignatureHelpOverlay(
     val popupMarginPx = with(density) { 8.dp.toPx() }
     val popupCursorGapPx = with(density) { 10.dp.toPx() }
     val popupNarrowEditorThresholdPx = with(density) { 500.dp.toPx() }
-    val displayedSignatureIndex = state.resolveDisplayedSignatureHelpIndex(resolvedResult)
+    val displayedSignatureIndex = state.assistance.resolveDisplayedSignatureHelpIndex(resolvedResult)
     val visibleSlice = resolvedResult?.let {
         resolveSignatureHelpVisibleSlice(
             totalCount = it.signatures.size,
@@ -509,8 +509,8 @@ internal fun EditorSignatureHelpOverlay(
         maxHeightPx = layout.maxHeightPx,
         colorScheme = state.colorScheme,
         isLoading = signatureState is SignatureHelpUiState.Loading,
-        onSelectSignature = { index -> state.selectSignatureHelp(index) },
-        onCycleSignature = { delta -> state.cycleSignatureHelp(delta) },
+        onSelectSignature = { index -> state.assistance.selectSignatureHelp(index) },
+        onCycleSignature = { delta -> state.assistance.cycleSignatureHelp(delta) },
         onDismiss = { session.interactionController.dismissSignatureHelp() }
     )
 }

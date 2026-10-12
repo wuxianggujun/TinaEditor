@@ -3,7 +3,7 @@ package com.wuxianggujun.tinaide.core.editorview
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.ui.input.key.KeyEvent as ComposeKeyEvent
 import com.google.common.truth.Truth.assertThat
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -334,7 +334,7 @@ class EditorKeyboardShortcutsTest {
             onAfterTextEdit = {},
             onRequestCompletion = {},
             onRequestSignatureHelp = {},
-            onCycleSignatureHelp = { delta -> state.cycleSignatureHelp(delta) },
+            onCycleSignatureHelp = { delta -> state.assistance.cycleSignatureHelp(delta) },
             onCompletionNavigate = { false },
             onApplySelectedCompletion = { false },
             onDismissCompletion = {},
@@ -344,7 +344,7 @@ class EditorKeyboardShortcutsTest {
         )
 
         assertThat(consumed).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(1)
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(1)
         assertThat(resolveDisplayedSignaturePreview(state)).isEqualTo("Boolean enabled")
     }
 
@@ -378,7 +378,7 @@ class EditorKeyboardShortcutsTest {
             onAfterTextEdit = {},
             onRequestCompletion = {},
             onRequestSignatureHelp = {},
-            onCycleSignatureHelp = { delta -> state.cycleSignatureHelp(delta) },
+            onCycleSignatureHelp = { delta -> state.assistance.cycleSignatureHelp(delta) },
             onCompletionNavigate = { false },
             onApplySelectedCompletion = { false },
             onDismissCompletion = {},
@@ -388,7 +388,7 @@ class EditorKeyboardShortcutsTest {
         )
 
         assertThat(consumed).isTrue()
-        assertThat(state.signatureHelpSelectedSignatureIndex).isEqualTo(2)
+        assertThat(state.assistance.signatureHelpSelectedSignatureIndex).isEqualTo(2)
         assertThat(resolveDisplayedSignaturePreview(state))
             .isEqualTo("Map<String, List<Int>> metadata")
     }
@@ -1290,12 +1290,12 @@ class EditorKeyboardShortcutsTest {
     }
 
     private fun resolveDisplayedSignaturePreview(state: EditorState): String? {
-        val result = when (val uiState = state.signatureHelpUiState) {
+        val result = when (val uiState = state.assistance.signatureHelpUiState) {
             is SignatureHelpUiState.Visible -> uiState.result
             is SignatureHelpUiState.Loading -> uiState.previousResult
             SignatureHelpUiState.Hidden -> return null
         } ?: return null
-        val displayedIndex = state.resolveDisplayedSignatureHelpIndex(result)
+        val displayedIndex = state.assistance.resolveDisplayedSignatureHelpIndex(result)
         return resolveSignatureActiveParameterPreview(
             signature = result.signatures[displayedIndex],
             activeParameter = result.activeParameter

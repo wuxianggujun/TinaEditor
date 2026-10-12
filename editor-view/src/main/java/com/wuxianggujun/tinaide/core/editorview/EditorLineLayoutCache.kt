@@ -16,7 +16,7 @@ import timber.log.Timber
  * 3. 尽量减少临时对象分配，降低 GC 抖动概率。
  *
  * 说明：
- * - 该缓存基于 [Paint.getTextRunAdvances] 获取每个 char 的 advance，并构建前缀和数组 prefix。
+ * - 该缓存基于 [Paint.getTextWidths] 获取每个 UTF-16 代码单元的 advance，并构建前缀和数组 prefix。
  * - 存在 Inlay Hint 时，[PrefixLayout.beforeInlayPrefix] 表示到达锚点前的位置，
  *   [PrefixLayout.prefix] 表示越过锚点提示后的字符/光标位置。
  * - 对单行的 column->x / x->column 都可以通过 prefix 进行 O(1)/O(logN) 计算。
@@ -276,15 +276,11 @@ internal class EditorLineLayoutCache(
             }
 
             val advances = scratchAdvances
-            paint.getTextRunAdvances(
+            paint.getTextWidths(
                 scratchChars,
                 0,
                 length,
-                0,
-                length,
-                false,
                 advances,
-                0,
             )
 
             val safeTabSize = tabSize.coerceAtLeast(1)
@@ -298,14 +294,8 @@ internal class EditorLineLayoutCache(
                     val step = (visualColumns[i + 1] - visualColumns[i]).coerceAtLeast(1)
                     spaceAdvance * step
                 } else {
-                    val runAdvance = advances[i].coerceAtLeast(0f)
-                    if (runAdvance > 0f) {
-                        runAdvance
-                    } else {
-                        // 某些运行时/测试环境里 getTextRunAdvances 可能返回 0，
-                        // 这里退回到单 glyph 量测，避免光标/弹窗横向锚点塌到行首。
-                        paint.measureText(lineText, i, i + 1).coerceAtLeast(0f)
-                    }
+                    // 代理项、组合字符和连接符可以合法地返回零宽，不能再单字符补测。
+                    advances[i].coerceAtLeast(0f)
                 }
                 running += advance
                 rawPrefix[i + 1] = running

@@ -1,7 +1,6 @@
 package com.wuxianggujun.tinaide.core.treesitter
 
 import android.content.Context
-import com.itsaky.androidide.treesitter.TSLanguage
 import com.itsaky.androidide.treesitter.TSParser
 import com.itsaky.androidide.treesitter.TSQuery
 import com.wuxianggujun.tinaide.core.textengine.TextChange
@@ -15,7 +14,6 @@ import kotlin.concurrent.write
 import timber.log.Timber
 
 class TreeSitterHighlighter private constructor(
-    private val language: TSLanguage,
     private val parser: TSParser,
     private val query: TSQuery,
     private val captureTypeByIndex: Array<HighlightType>
@@ -36,60 +34,6 @@ class TreeSitterHighlighter private constructor(
             runCatching { parser.close() }
         }
     )
-
-    override fun highlight(text: String, visibleRange: IntRange): List<HighlightSpan> {
-        if (disposed.get() || text.isEmpty() || visibleRange.isEmpty()) return emptyList()
-        return lifecycleLock.read {
-            if (disposed.get() || !query.canAccess()) {
-                return@read emptyList()
-            }
-
-            state.readSnapshot(text)?.let { snapshot ->
-                return@read runCatching {
-                    snapshot.accessTree { tree ->
-                        captureHighlightSpans(
-                            query = query,
-                            captureTypeByIndex = captureTypeByIndex,
-                            rootNode = tree.rootNode,
-                            sourceText = text,
-                            predicateEvaluator = predicateEvaluator,
-                            visibleRange = visibleRange
-                        )
-                    }
-                }.onFailure { error ->
-                    Timber.tag("TreeSitter").d(error, "Snapshot highlight pass failed")
-                }.getOrDefault(emptyList())
-            }
-
-            val compatibilityParser = runCatching { TSParser.create() }
-                .onFailure { error ->
-                    Timber.tag("TreeSitter").w(error, "Failed to create compatibility parser")
-                }
-                .getOrNull() ?: return@read emptyList()
-
-            try {
-                compatibilityParser.setLanguage(language)
-                val tree = compatibilityParser.parseString(text) ?: return@read emptyList()
-                try {
-                    captureHighlightSpans(
-                        query = query,
-                        captureTypeByIndex = captureTypeByIndex,
-                        rootNode = tree.rootNode,
-                        sourceText = text,
-                        predicateEvaluator = predicateEvaluator,
-                        visibleRange = visibleRange
-                    )
-                } finally {
-                    runCatching { tree.close() }
-                }
-            } catch (error: Throwable) {
-                Timber.tag("TreeSitter").d(error, "Compatibility highlight pass failed")
-                emptyList()
-            } finally {
-                runCatching { compatibilityParser.close() }
-            }
-        }
-    }
 
     override fun openDocument(text: String) {
         if (disposed.get()) return
@@ -211,7 +155,6 @@ class TreeSitterHighlighter private constructor(
                 }
                 val captureTypeByIndex = buildCaptureTypeLookup(query.captureNames)
                 TreeSitterHighlighter(
-                    language = language,
                     parser = parser,
                     query = query,
                     captureTypeByIndex = captureTypeByIndex

@@ -3,7 +3,7 @@ package com.wuxianggujun.tinaide.core.editorview
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.Position
 import kotlinx.coroutines.CancellationException
 import timber.log.Timber
@@ -11,20 +11,16 @@ import timber.log.Timber
 /**
  * Hover 与 SignatureHelp 的 UI 状态机控制器。
  *
- * 从 [EditorState] 抽出的内聚块：维护 hover / signatureHelp 两套“requestId 防竞态 + UiState publish”
+ * 维护 hover / signatureHelp 两套“requestId 防竞态 + UiState publish”
  * 状态机，以及 signatureHelp 的选中序号。两块彼此独立，只共享 cursorPosition（经 [Host] 注入），
- * 与补全 / snippet 无耦合，因此整体抽出最干净。
+ * 与补全 / snippet 无耦合。
  *
  * 该块依赖宿主的少量只读量与回调（光标位置、两个 provider 回调），通过 [Host] 接口注入，
  * 组合而非继承（D 依赖倒置）。
  *
- * 行为与原内联实现严格一致：requestId 自增/比对、异常分支清理、normalize* 归一化时机均逐行对应原
- * [EditorState] 实现。
- *
  * 可观察性说明：
  * - [hoverUiState] / [signatureHelpUiState] / [signatureHelpSelectedSignatureIndex] 仍由
- *   `mutableStateOf` 承载。Compose 快照按 StateObject 身份记录读取，与持有它的对象类无关，因此
- *   [EditorState] 暴露的 get-only 委托属性（及模块内 9+ 文件经 state.x 的直接读取）仍会触发重组。
+ *   `mutableStateOf` 承载。Compose 经 `state.assistance` 直接读取，不在 [EditorState] 中维护镜像状态。
  */
 internal class EditorHoverSignatureController(
     private val host: Host

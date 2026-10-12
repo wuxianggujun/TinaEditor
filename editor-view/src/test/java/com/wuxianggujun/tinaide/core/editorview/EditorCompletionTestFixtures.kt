@@ -9,7 +9,7 @@ internal fun EditorState.seedVisibleCompletion(
     selectedIndex: Int = 0,
     requestId: Long = 1L
 ) {
-    showInlineCompletionItems(
+    completion.showInlineCompletionItems(
         items = items,
         selectedIndex = selectedIndex,
         query = query,

@@ -2,6 +2,7 @@ package com.wuxianggujun.tinaide.core.editorview
 
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.config.EditorThemeColorKey
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenType
 import java.util.Locale
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,6 +12,19 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class EditorColorSchemeTest {
+
+    @Test
+    fun retiredThemeKeysCannotOverrideCanonicalColors() {
+        val colors = mapOf(
+            EditorThemeColorKey.EDITOR_BACKGROUND.wireName to "#FF112233",
+            "4" to "#FF445566",
+            "WHOLE_BACKGROUND" to "#FF778899",
+        )
+
+        val exported = EditorColorScheme.fromThemeColors(colors).toThemeColors()
+
+        assertThat(exported[EditorThemeColorKey.EDITOR_BACKGROUND.wireName]).isEqualTo("#FF112233")
+    }
 
     @Test
     fun colorOfSemantic_shouldUseConstantColorForEnumMembers() {

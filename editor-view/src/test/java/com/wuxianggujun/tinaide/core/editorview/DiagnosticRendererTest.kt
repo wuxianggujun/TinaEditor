@@ -36,8 +36,8 @@ class DiagnosticRendererTest {
     fun hiddenDiagnostics_skipTextReads() {
         val state = createState()
         state.diagnosticsByLine = mapOf(1 to listOf(EditorDiagnostic(1, 0, 2, "test", DiagnosticSeverity.ERROR)))
-        state.setFoldRegions(listOf(FoldRegion(0, 1)), state.textBuffer.version)
-        state.toggleFoldAtLine(0)
+        state.folding.setFoldRegions(listOf(FoldRegion(0, 1)), state.textBuffer.version)
+        state.folding.toggleFoldAtLine(0)
         assertThat(drawAndCollectReads(state)).isEmpty()
     }
 

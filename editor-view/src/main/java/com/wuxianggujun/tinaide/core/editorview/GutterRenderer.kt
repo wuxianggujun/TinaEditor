@@ -30,7 +30,7 @@ class GutterRenderer(
         val foldCenterX = originX + widthPx * 0.5f
         val iconBox = (min(widthPx, lineHeightPx) * 0.62f).coerceAtLeast(8f)
         val half = iconBox * 0.5f
-        val foldingValid = state.isFoldingDataValid()
+        val foldingValid = state.folding.isFoldingDataValid()
 
         if (iconBox != templateIconBox) {
             templateIconBox = iconBox
@@ -55,8 +55,8 @@ class GutterRenderer(
             if (!decoration.foldable || !foldingValid) return@forEach
 
             val centerY = visualLine * lineHeightPx - scrollOffsetPx + lineHeightPx / 2f
-            val collapsed = state.isFoldCollapsedAtLine(line)
-            val hasHiddenDiagnostic = state.hasHiddenDiagnosticsInFold(line)
+            val collapsed = state.folding.isFoldCollapsedAtLine(line)
+            val hasHiddenDiagnostic = state.folding.hasHiddenDiagnosticsInFold(line)
             val foldColor = when {
                 hasHiddenDiagnostic -> scheme.foldIconWarning
                 collapsed -> scheme.foldIconCollapsed

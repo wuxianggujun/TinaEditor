@@ -2,7 +2,7 @@ package com.wuxianggujun.tinaide.core.editorview
 
 import androidx.compose.ui.focus.FocusRequester
 import com.google.common.truth.Truth.assertThat
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -45,7 +45,7 @@ class EditorInteractionControllerTest {
         advanceUntilIdle()
 
         assertThat(requestCount).isEqualTo(1)
-        assertThat(state.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
+        assertThat(state.assistance.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
         job.cancel()
     }
 
@@ -72,7 +72,7 @@ class EditorInteractionControllerTest {
         advanceUntilIdle()
 
         assertThat(requestCount).isEqualTo(0)
-        assertThat(state.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
+        assertThat(state.assistance.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
         job.cancel()
     }
 
@@ -92,7 +92,7 @@ class EditorInteractionControllerTest {
         state.selectRange(startOffset = 6, endOffset = 8)
         advanceUntilIdle()
 
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
         job.cancel()
     }
 
@@ -112,7 +112,7 @@ class EditorInteractionControllerTest {
         state.updateFocus(false)
         advanceUntilIdle()
 
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
         job.cancel()
     }
 
@@ -173,7 +173,7 @@ class EditorInteractionControllerTest {
         advanceUntilIdle()
 
         assertThat(requestCount).isEqualTo(1)
-        assertThat(state.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
+        assertThat(state.assistance.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
         job.cancel()
     }
 
@@ -195,7 +195,7 @@ class EditorInteractionControllerTest {
         state.moveCursorTo(targetCursor)
         advanceUntilIdle()
 
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
         job.cancel()
     }
 
@@ -224,7 +224,7 @@ class EditorInteractionControllerTest {
         advanceUntilIdle()
 
         assertThat(requestCount).isEqualTo(1)
-        assertThat(state.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
+        assertThat(state.assistance.signatureHelpUiState).isInstanceOf(SignatureHelpUiState.Visible::class.java)
         job.cancel()
     }
 
@@ -246,7 +246,7 @@ class EditorInteractionControllerTest {
         state.moveCursorTo(targetCursor)
         advanceUntilIdle()
 
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
         job.cancel()
     }
 
@@ -270,10 +270,10 @@ class EditorInteractionControllerTest {
         controller.requestHover()
         advanceUntilIdle()
 
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.completionUiState).isEqualTo(CompletionUiState.Hidden)
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
-        assertThat(state.hoverUiState).isEqualTo(HoverUiState.Visible("hover docs"))
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.completionUiState).isEqualTo(CompletionUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.assistance.hoverUiState).isEqualTo(HoverUiState.Visible("hover docs"))
     }
 
     @Test
@@ -295,11 +295,11 @@ class EditorInteractionControllerTest {
         controller.requestManualCompletion()
         advanceUntilIdle()
 
-        assertThat(state.hoverUiState).isEqualTo(HoverUiState.Hidden)
-        assertThat(state.signatureHelpUiState)
+        assertThat(state.assistance.hoverUiState).isEqualTo(HoverUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState)
             .isInstanceOf(SignatureHelpUiState.Visible::class.java)
-        assertThat(state.showCompletion).isTrue()
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.showCompletion).isTrue()
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("print", "private")
             .inOrder()
     }
@@ -324,11 +324,11 @@ class EditorInteractionControllerTest {
         controller.requestManualSignatureHelp()
         advanceUntilIdle()
 
-        assertThat(state.hoverUiState).isEqualTo(HoverUiState.Hidden)
-        assertThat(state.showCompletion).isTrue()
-        assertThat(state.completionUiState)
+        assertThat(state.assistance.hoverUiState).isEqualTo(HoverUiState.Hidden)
+        assertThat(state.completion.showCompletion).isTrue()
+        assertThat(state.completion.completionUiState)
             .isInstanceOf(CompletionUiState.Visible::class.java)
-        assertThat(state.signatureHelpUiState)
+        assertThat(state.assistance.signatureHelpUiState)
             .isInstanceOf(SignatureHelpUiState.Visible::class.java)
     }
 

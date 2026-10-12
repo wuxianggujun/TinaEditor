@@ -9,23 +9,19 @@ import com.wuxianggujun.tinaide.core.textengine.TextBuffer
 /**
  * 补全（completion）与 snippet 会话的状态机控制器。
  *
- * 从 [EditorState] 抽出的剩余最大内聚块：补全列表/查询/选中/UiState 的 publish 状态机，以及与之
+ * 管理补全列表/查询/选中/UiState 的 publish 状态机，以及与之
  * 双向耦合的 snippet 会话（tabstop 跳转、占位符聚焦、choice 占位符联动补全弹窗）。两块互相调用
  * （snippet 占位符聚焦会弹出 choice 补全；取消 snippet 会关闭补全；请求补全会清除 snippet choice
- * 标记），因此必须作为同一个边界整体抽出 —— 互调在类内变成普通方法调用，最干净。
+ * 标记），因此二者由同一个控制器管理。
  *
  * 该块依赖宿主的少量只读量与回调（光标位置/文本缓冲/补全大小写敏感开关/补全 provider，以及
  * “按光标取补全前缀、移动光标、回写选区、应用补全项”四个回调），通过 [Host] 接口注入，
  * 组合而非继承（D 依赖倒置）。
  *
- * 行为与原内联实现严格一致：requestId 自增/比对、防竞态返回时机、缓存（cachedCompletionResults/
- * Prefix）置位时机、snippet 偏移调整与占位符聚焦顺序均逐行对应原 [EditorState] 实现。
- *
  * 可观察性说明：
  * - [completionItems] / [completionSelectedIndex] / [completionQuery] / [completionUiState] /
  *   [snippetChoiceCompletionActive] / [activeSnippetSession] 仍由 `mutableStateOf` 承载。Compose
- *   快照按 StateObject 身份记录读取，与持有它的对象类无关，因此 [EditorState] 暴露的 get-only 委托
- *   属性（及模块内多个 Compose 文件经 state.x 的直接读取）仍会触发重组。
+ *   快照直接跟踪模块内经 `state.completion` 读取的属性，不在 [EditorState] 中维护镜像状态。
  * - [showCompletion] 为派生只读，跟随 [completionUiState] / [completionItems]。
  * - [Host.setSelectionRange] 用于把 snippet 占位符聚焦产生的选区回写到宿主真实的 selectionRange
  *   state，绝不能在本类另存副本，否则丢可观察性。

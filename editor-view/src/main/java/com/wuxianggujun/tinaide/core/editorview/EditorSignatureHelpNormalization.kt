@@ -1,6 +1,6 @@
 package com.wuxianggujun.tinaide.core.editorview
 
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 
 /**
  * 签名帮助结果的归一化纯函数。

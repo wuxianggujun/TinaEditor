@@ -7,7 +7,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.google.common.truth.Truth.assertThat
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import org.junit.Rule
 import org.junit.Test
@@ -100,10 +100,10 @@ class EditorRuntimeEffectsTest {
 
         assertThat(state.isFocused).isFalse()
         assertThat(state.cursorBlinkVisible).isFalse()
-        assertThat(state.hoverUiState).isEqualTo(HoverUiState.Hidden)
-        assertThat(state.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
-        assertThat(state.showCompletion).isTrue()
-        assertThat(state.completionUiState).isInstanceOf(CompletionUiState.Visible::class.java)
+        assertThat(state.assistance.hoverUiState).isEqualTo(HoverUiState.Hidden)
+        assertThat(state.assistance.signatureHelpUiState).isEqualTo(SignatureHelpUiState.Hidden)
+        assertThat(state.completion.showCompletion).isTrue()
+        assertThat(state.completion.completionUiState).isInstanceOf(CompletionUiState.Visible::class.java)
     }
 
 }

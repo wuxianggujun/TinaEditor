@@ -11,9 +11,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(manifest = Config.NONE, sdk = [34])
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class WordOccurrenceHighlightRendererTest {
 
     @Test
@@ -211,8 +213,8 @@ class WordOccurrenceHighlightRendererTest {
         val buffer = CountingTextBuffer(RopeTextBuffer((0 until 5_000).joinToString("\n") { "foo bar" }))
         val state = EditorState(buffer, config = EditorConfig(wordWrap = false, codeFolding = true)).apply {
             updateMetrics(20f, 1f, 120f, 100f, 0f)
-            setFoldRegions(listOf(FoldRegion(100, 4_900)), buffer.version)
-            toggleFoldAtLine(100)
+            folding.setFoldRegions(listOf(FoldRegion(100, 4_900)), buffer.version)
+            folding.toggleFoldAtLine(100)
             cursorOffset = buffer.positionToOffset(95, 1)
             scrollToLine(95)
         }

@@ -1,7 +1,7 @@
 package com.wuxianggujun.tinaide.core.editorview
 
-import java.util.regex.Pattern
-import java.util.regex.PatternSyntaxException
+import com.google.re2j.Pattern
+import com.google.re2j.PatternSyntaxException
 
 data class EditorFindOptions(
     val caseSensitive: Boolean = false,
@@ -17,7 +17,7 @@ internal data class EditorFindResult(
     val error: EditorFindError? = null
 )
 
-/** One matcher defines both navigation and replacement, including zero-width matches. */
+/** RE2 is the sole matcher for navigation/replacement; unsupported regex fails without a fallback. */
 internal object EditorFindEngine {
     fun scan(
         text: String,
@@ -31,7 +31,7 @@ internal object EditorFindEngine {
         val pattern = try {
             Pattern.compile(
                 if (options.regex) query else Pattern.quote(query),
-                if (options.caseSensitive) 0 else Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CASE
+                if (options.caseSensitive) 0 else Pattern.CASE_INSENSITIVE
             )
         } catch (_: PatternSyntaxException) {
             return EditorFindResult(error = EditorFindError.InvalidQuery)

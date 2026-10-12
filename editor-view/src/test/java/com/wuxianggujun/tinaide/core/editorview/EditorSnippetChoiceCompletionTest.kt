@@ -15,14 +15,14 @@ class EditorSnippetChoiceCompletionTest {
     fun startSnippetSession_shouldShowChoiceCompletionItems() {
         val state = createSnippetState("fun \${1|one,two,three|}()")
 
-        assertThat(state.showCompletion).isTrue()
-        assertThat(state.snippetChoiceCompletionActive).isTrue()
-        assertThat(state.completionItems.map { it.label })
+        assertThat(state.completion.showCompletion).isTrue()
+        assertThat(state.completion.snippetChoiceCompletionActive).isTrue()
+        assertThat(state.completion.completionItems.map { it.label })
             .containsExactly("one", "two", "three")
             .inOrder()
-        assertThat(state.completionSelectedIndex).isEqualTo(0)
+        assertThat(state.completion.completionSelectedIndex).isEqualTo(0)
         assertThat(state.selectionRange).isEqualTo(OffsetRange(4, 7))
-        assertThat(state.completionItems.map { it.textEdit?.newText })
+        assertThat(state.completion.completionItems.map { it.textEdit?.newText })
             .containsExactly("one", "two", "three")
             .inOrder()
     }
@@ -31,34 +31,34 @@ class EditorSnippetChoiceCompletionTest {
     fun applySelectedCompletion_shouldSyncRepeatedChoiceTabstopGroup() {
         val state = createSnippetState("const \${1|one,two|} = \${1|one,two|};")
 
-        val selected = state.setCompletionSelectedIndex(1)
-        val applied = state.applySelectedCompletion()
+        val selected = state.completion.setCompletionSelectedIndex(1)
+        val applied = state.completion.applySelectedCompletion()
 
         assertThat(selected).isTrue()
         assertThat(applied).isTrue()
         assertThat(state.textBuffer.substring(0, state.textBuffer.length))
             .isEqualTo("const two = two;")
-        assertThat(state.activeSnippetSession).isNotNull()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.length })
+        assertThat(state.completion.activeSnippetSession).isNotNull()
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.length })
             .containsExactly(3, 3)
             .inOrder()
-        assertThat(state.activeSnippetSession!!.currentGroup().map { it.offsetInText })
+        assertThat(state.completion.activeSnippetSession!!.currentGroup().map { it.offsetInText })
             .containsExactly(6, 12)
             .inOrder()
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.snippetChoiceCompletionActive).isFalse()
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.snippetChoiceCompletionActive).isFalse()
     }
 
     @Test
     fun advanceSnippet_shouldDismissChoiceCompletionWhenSessionEnds() {
         val state = createSnippetState("\${1|one,two|}")
 
-        val consumed = state.advanceSnippet()
+        val consumed = state.completion.advanceSnippet()
 
         assertThat(consumed).isTrue()
-        assertThat(state.activeSnippetSession).isNull()
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.snippetChoiceCompletionActive).isFalse()
+        assertThat(state.completion.activeSnippetSession).isNull()
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.snippetChoiceCompletionActive).isFalse()
     }
 
     private fun createSnippetState(snippet: String): EditorState {
@@ -67,7 +67,7 @@ class EditorSnippetChoiceCompletionTest {
             insert(0, parsed.expandedText)
         }
         return EditorState(buffer).apply {
-            startSnippetSession(
+            completion.startSnippetSession(
                 SnippetSession(
                     baseOffset = 0,
                     parsed = parsed

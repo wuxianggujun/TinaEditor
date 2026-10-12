@@ -1,7 +1,6 @@
 package com.wuxianggujun.tinaide.core.treesitter
 
 import com.google.common.truth.Truth.assertThat
-import com.itsaky.androidide.treesitter.TSLanguage
 import com.itsaky.androidide.treesitter.TSParser
 import com.itsaky.androidide.treesitter.TSQuery
 import io.mockk.every
@@ -84,14 +83,12 @@ class TreeSitterHighlighterDisposeTest {
         }
     ): TreeSitterHighlighter {
         val constructor = TreeSitterHighlighter::class.java.getDeclaredConstructor(
-            TSLanguage::class.java,
             TSParser::class.java,
             TSQuery::class.java,
             Array<HighlightType>::class.java
         )
         constructor.isAccessible = true
         return constructor.newInstance(
-            mockk<TSLanguage>(),
             parser,
             query,
             emptyArray<HighlightType>()

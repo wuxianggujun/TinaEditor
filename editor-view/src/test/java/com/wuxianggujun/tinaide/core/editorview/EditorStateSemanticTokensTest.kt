@@ -1,5 +1,8 @@
 package com.wuxianggujun.tinaide.core.editorview
 
+import com.wuxianggujun.tinaide.core.editorapi.SemanticToken
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenModifier
+import com.wuxianggujun.tinaide.core.editorapi.SemanticTokenType
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextChange

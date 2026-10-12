@@ -96,7 +96,7 @@ internal fun EditorFindBar(
                 IconButton(onClick = { navigate(false) }, enabled = find.matchCount > 0) {
                     Icon(Icons.Default.KeyboardArrowDown, stringResource(R.string.editor_find_next))
                 }
-                IconButton(onClick = onDismiss) {
+                IconButton(onClick = onDismiss, modifier = Modifier.testTag("editor_find_close")) {
                     Icon(Icons.Default.Close, stringResource(R.string.editor_find_close))
                 }
             }
@@ -116,13 +116,14 @@ internal fun EditorFindBar(
             if (find.showReplacement) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = find.replacement, onValueChange = { find.replacement = it },
-                        modifier = Modifier.weight(1f), singleLine = true,
+                        modifier = Modifier.weight(1f).testTag("editor_find_replacement"), singleLine = true,
                         label = { Text(stringResource(R.string.editor_find_replacement)) },
                         isError = find.error == EditorFindError.InvalidReplacement)
                     TextButton(onClick = { beforeEdit(); find.replaceCurrent(); afterAction() }, enabled = find.matchCount > 0) {
                         Text(stringResource(R.string.editor_find_replace))
                     }
-                    TextButton(onClick = { beforeEdit(); find.replaceAll(); afterAction() }, enabled = find.matchCount > 0) {
+                    TextButton(onClick = { beforeEdit(); find.replaceAll(); afterAction() }, enabled = find.matchCount > 0,
+                        modifier = Modifier.testTag("editor_find_replace_all")) {
                         Text(stringResource(R.string.editor_find_replace_all))
                     }
                 }

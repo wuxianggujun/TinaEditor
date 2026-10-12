@@ -1,6 +1,6 @@
 package com.wuxianggujun.tinaide.core.editorview
 
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 
 internal fun EditorState.seedVisibleSignatureHelp(
     result: SignatureHelpResult = SignatureHelpResult(
@@ -11,7 +11,7 @@ internal fun EditorState.seedVisibleSignatureHelp(
     requestId: Long = 1L,
     selectedIndex: Int? = null
 ) {
-    publishSignatureHelpVisible(
+    assistance.publishSignatureHelpVisible(
         result = result,
         requestId = requestId,
         selectedIndex = selectedIndex
@@ -27,7 +27,7 @@ internal fun EditorState.seedLoadingSignatureHelp(
     requestId: Long = 1L,
     selectedIndex: Int? = null
 ) {
-    publishSignatureHelpLoading(
+    assistance.publishSignatureHelpLoading(
         previousResult = previousResult,
         requestId = requestId,
         selectedIndex = selectedIndex

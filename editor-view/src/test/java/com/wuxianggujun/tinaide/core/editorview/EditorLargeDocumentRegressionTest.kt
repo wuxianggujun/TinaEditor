@@ -2,7 +2,6 @@ package com.wuxianggujun.tinaide.core.editorview
 
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
-import com.wuxianggujun.tinaide.core.textengine.TextChange
 import com.wuxianggujun.tinaide.core.treesitter.TreeSitterFoldingProvider.FoldRegion
 import org.junit.Test
 
@@ -80,18 +79,18 @@ class EditorLargeDocumentRegressionTest {
         )
 
         val currentVersion = buffer.version
-        state.setFoldRegions(
+        state.folding.setFoldRegions(
             regions = listOf(FoldRegion(startLine = 0, endLine = 3)),
             documentVersion = currentVersion
         )
-        state.toggleFoldAtLine(0)
-        assertThat(state.isFoldCollapsedAtLine(0)).isTrue()
+        state.folding.toggleFoldAtLine(0)
+        assertThat(state.folding.isFoldCollapsedAtLine(0)).isTrue()
 
-        state.setFoldRegions(
+        state.folding.setFoldRegions(
             regions = emptyList(),
             documentVersion = currentVersion - 1
         )
-        assertThat(state.isFoldCollapsedAtLine(0)).isTrue()
+        assertThat(state.folding.isFoldCollapsedAtLine(0)).isTrue()
     }
 
     private fun applyInsert(
@@ -103,19 +102,6 @@ class EditorLargeDocumentRegressionTest {
     ) {
         val offset = buffer.positionToOffset(line, column)
         buffer.insert(offset, replacement)
-        state.applyTextBufferChange(
-            TextChange(
-                startOffset = offset,
-                endOffset = offset,
-                oldText = "",
-                newText = replacement,
-                startLine = line,
-                startColumn = column,
-                endLine = line,
-                endColumn = column,
-                documentVersion = buffer.version
-            )
-        )
     }
 
 }

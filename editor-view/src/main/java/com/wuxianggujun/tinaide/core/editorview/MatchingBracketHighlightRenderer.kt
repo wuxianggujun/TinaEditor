@@ -101,7 +101,7 @@ internal class MatchingBracketHighlightRenderer {
         columns: IntArray
     ) {
         val state = frameContext.state
-        if (state.isDocLineHidden(line)) return
+        if (state.folding.isDocLineHidden(line)) return
 
         val lineText = frameContext.lineText(line)
         val prefixLayout = lineLayoutCache.getPrefixLayout(

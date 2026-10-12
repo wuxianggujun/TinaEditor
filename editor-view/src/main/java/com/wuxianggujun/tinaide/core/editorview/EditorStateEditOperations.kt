@@ -42,7 +42,7 @@ internal fun editorInsert(state: EditorState, text: String) {
                 historyCursor = state.historyCursorAfter(safeStart, safeEnd, targetCursorOffset)
             )
             if (delta != 0) {
-                state.adjustSnippetOffsets(safeStart, delta)
+                state.completion.adjustSnippetOffsets(safeStart, delta)
             }
         }
         state.emitTextChanged(reason = "insert")
@@ -97,7 +97,7 @@ private fun applySynchronizedSnippetGroupReplace(
     reason: String,
     cursorOffsetAfterEdit: Int? = null
 ): Boolean {
-    val session = state.activeSnippetSession ?: return false
+    val session = state.completion.activeSnippetSession ?: return false
     val group = session.currentGroup()
     if (group.size <= 1) return false
 
@@ -139,7 +139,7 @@ private fun applySynchronizedSnippetGroupReplace(
             state.textBuffer.replace(replaceStart, replaceEnd, replacement)
         }
 
-        state.updateSnippetSession(updatedSession)
+        state.completion.updateSnippetSession(updatedSession)
         state.moveCursorTo(targetCursorOffset)
     }
     state.emitTextChanged(reason = reason)
@@ -165,7 +165,7 @@ internal fun editorBackspace(state: EditorState) {
             val selStart = selRange.start
             val selLen = selRange.end - selStart
             if (deleteSelectionIfPresent(state, reason = "backspaceSelection")) {
-                state.adjustSnippetOffsets(selStart, -selLen)
+                state.completion.adjustSnippetOffsets(selStart, -selLen)
             }
             return@traceSlowOperation
         }
@@ -193,7 +193,7 @@ internal fun editorBackspace(state: EditorState) {
                     historyCursor = state.historyCursorAfter(offset - 1, offset + 1, targetCursorOffset)
                 )
                 state.emitTextChanged(reason = "backspacePair")
-                state.adjustSnippetOffsets(offset - 1, -2)
+                state.completion.adjustSnippetOffsets(offset - 1, -2)
                 state.moveCursorTo(targetCursorOffset)
                 return@traceSlowOperation
             }
@@ -203,24 +203,24 @@ internal fun editorBackspace(state: EditorState) {
         val targetOffset = offset - deleteCount
         val targetPos = state.textBuffer.offsetToPosition(targetOffset)
 
-        if (state.isDocLineHidden(targetPos.line)) {
-            if (state.isFoldEndLineVirtuallyVisible(targetPos.line)) {
+        if (state.folding.isDocLineHidden(targetPos.line)) {
+            if (state.folding.isFoldEndLineVirtuallyVisible(targetPos.line)) {
                 val endLineText = state.textBuffer.getLine(targetPos.line)
                 val trimStartCol = TextScanKernel
                     .scanLineWhitespace(endLineText, state.config.tabSize)
                     .leadingWhitespaceEnd
                 if (targetPos.column < trimStartCol) {
-                    val ownerStart = state.foldOwnerForEndLine(targetPos.line)
+                    val ownerStart = state.folding.foldOwnerForEndLine(targetPos.line)
                     if (ownerStart >= 0) {
-                        state.toggleFoldAtLine(ownerStart)
+                        state.folding.toggleFoldAtLine(ownerStart)
                         state.moveCursorTo(offset)
                         return@traceSlowOperation
                     }
                 }
             } else {
-                val ownerStart = state.foldOwnerForHiddenLine(targetPos.line)
+                val ownerStart = state.folding.foldOwnerForHiddenLine(targetPos.line)
                 if (ownerStart >= 0) {
-                    state.toggleFoldAtLine(ownerStart)
+                    state.folding.toggleFoldAtLine(ownerStart)
                     state.moveCursorTo(offset)
                     return@traceSlowOperation
                 }
@@ -244,20 +244,20 @@ internal fun editorBackspace(state: EditorState) {
             historyCursor = state.historyCursorAfter(deleteStart, offset, targetOffset)
         )
         state.emitTextChanged(reason = "backspace")
-        state.adjustSnippetOffsets(deleteStart, -deleteCount)
+        state.completion.adjustSnippetOffsets(deleteStart, -deleteCount)
 
         val newOffset = offset - deleteCount
         val newPos = state.textBuffer.offsetToPosition(newOffset)
-        if (state.isFoldEndLineVirtuallyVisible(newPos.line)) {
+        if (state.folding.isFoldEndLineVirtuallyVisible(newPos.line)) {
             val endLineText = state.textBuffer.getLine(newPos.line)
             val whitespaceInfo = TextScanKernel.scanLineWhitespace(endLineText, state.config.tabSize)
             val trimmedEnd = whitespaceInfo.trailingWhitespaceStart
             val foldEndBroken = trimmedEnd <= 0 || endLineText[trimmedEnd - 1] != '}'
             if (foldEndBroken) {
-                val ownerStart = state.foldOwnerForEndLine(newPos.line)
+                val ownerStart = state.folding.foldOwnerForEndLine(newPos.line)
                 if (ownerStart >= 0) {
-                    state.markFoldAsBroken(ownerStart)
-                    state.toggleFoldAtLine(ownerStart)
+                    state.folding.markFoldAsBroken(ownerStart)
+                    state.folding.toggleFoldAtLine(ownerStart)
                 }
             }
         }
@@ -284,7 +284,7 @@ internal fun editorDeleteForward(state: EditorState) {
             val selStart = selRange.start
             val selLen = selRange.end - selStart
             if (deleteSelectionIfPresent(state, reason = "deleteSelection")) {
-                state.adjustSnippetOffsets(selStart, -selLen)
+                state.completion.adjustSnippetOffsets(selStart, -selLen)
             }
             return@traceSlowOperation
         }
@@ -307,7 +307,7 @@ internal fun editorDeleteForward(state: EditorState) {
             historyCursor = state.historyCursorAfter(offset, offset + deleteCount, offset)
         )
         state.emitTextChanged(reason = "deleteForward")
-        state.adjustSnippetOffsets(offset, -deleteCount)
+        state.completion.adjustSnippetOffsets(offset, -deleteCount)
     }
 }
 
@@ -355,7 +355,7 @@ internal fun editorReplaceSelection(state: EditorState, replacement: String): Bo
             historyCursor = state.historyCursorAfter(safeStart, safeEnd, targetCursorOffset)
         )
         if (delta != 0) {
-            state.adjustSnippetOffsets(safeStart, delta)
+            state.completion.adjustSnippetOffsets(safeStart, delta)
         }
     }
     state.emitTextChanged(reason = "replaceSelection")
@@ -422,7 +422,7 @@ internal fun editorReplaceRange(
                 historyCursor = state.historyCursorAfter(safeStart, safeEnd, targetCursorOffset)
             )
             if (delta != 0) {
-                state.adjustSnippetOffsets(safeStart, delta)
+                state.completion.adjustSnippetOffsets(safeStart, delta)
             }
         }
         state.emitTextChanged(reason = "replaceRange")
@@ -434,7 +434,7 @@ internal fun editorReplaceRange(
 internal fun editorUndo(state: EditorState): Boolean {
     return state.traceSlowOperation("undo") {
         val result = state.textBuffer.undo() ?: return@traceSlowOperation false
-        state.cancelSnippet()
+        state.completion.cancelSnippet()
         state.emitTextChanged(reason = "undo")
         restoreUndoRedoSelection(state, result.selection, result.cursorOffset)
         true
@@ -444,7 +444,7 @@ internal fun editorUndo(state: EditorState): Boolean {
 internal fun editorRedo(state: EditorState): Boolean {
     return state.traceSlowOperation("redo") {
         val result = state.textBuffer.redo() ?: return@traceSlowOperation false
-        state.cancelSnippet()
+        state.completion.cancelSnippet()
         state.emitTextChanged(reason = "redo")
         restoreUndoRedoSelection(state, result.selection, result.cursorOffset)
         true
@@ -459,7 +459,7 @@ internal fun editorApplyCompletion(state: EditorState, item: EditorCompletionIte
     }
     val normalizedItem = itemWithPrimaryEdit.normalizeCompletionPrimaryEditForCurrentCursor(state)
         ?: run {
-            state.dismissCompletion()
+            state.completion.dismissCompletion()
             return
         }
     val snippetText = normalizedItem.snippetText
@@ -468,7 +468,7 @@ internal fun editorApplyCompletion(state: EditorState, item: EditorCompletionIte
         return
     }
     if (!applyCompletionWithTextEdits(state, normalizedItem)) {
-        state.dismissCompletion()
+        state.completion.dismissCompletion()
     }
 }
 
@@ -531,7 +531,7 @@ private fun applySnippetCompletion(
             plainItem.copy(textEdit = synthesizePrimaryCompletionEdit(state, plainItem.insertText))
         }
         if (!applyCompletionWithTextEdits(state, normalizedItem)) {
-            state.dismissCompletion()
+            state.completion.dismissCompletion()
         }
         return
     }
@@ -547,11 +547,11 @@ private fun applySnippetCompletion(
         additionalEdits = item.additionalTextEdits
     )
     if (resolvedEdits == null) {
-        state.dismissCompletion()
+        state.completion.dismissCompletion()
         return
     }
 
-    state.cancelSnippet()
+    state.completion.cancelSnippet()
 
     val application = state.textBuffer.editTransaction<CompletionAppliedEdits?>(
         cursorBefore = state.cursorOffset,
@@ -561,8 +561,8 @@ private fun applySnippetCompletion(
     ) {
         val result = applyResolvedCompletionEdits(state, resolvedEdits)
             ?: return@editTransaction null
-        state.dismissCompletion()
-        state.startSnippetSession(
+        state.completion.dismissCompletion()
+        state.completion.startSnippetSession(
             SnippetSession(
                 baseOffset = result.primaryStartOffset,
                 parsed = parsed
@@ -570,7 +570,7 @@ private fun applySnippetCompletion(
         )
         result
     } ?: run {
-        state.dismissCompletion()
+        state.completion.dismissCompletion()
         return
     }
     if (application.changed) {
@@ -621,7 +621,7 @@ private fun applyCompletionWithTextEdits(
                 reason = "applyCompletionSnippetGroup"
             )
         ) {
-            state.dismissCompletion()
+            state.completion.dismissCompletion()
             return true
         }
     }
@@ -640,7 +640,7 @@ private fun applyCompletionWithTextEdits(
     if (application.changed) {
         state.emitTextChanged(reason = "applyCompletion")
     }
-    state.dismissCompletion()
+    state.completion.dismissCompletion()
     return true
 }
 
@@ -798,7 +798,7 @@ internal fun editorToggleLineComment(
     if (state.hasMultipleSelections) {
         return editorToggleLineCommentMultipleSelections(state, commentToken)
     }
-    state.cancelSnippet()
+    state.completion.cancelSnippet()
 
     val range = state.selectionRange
     val hasSelection = range != null && !range.isEmpty

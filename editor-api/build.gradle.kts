@@ -20,7 +20,3 @@ ktlint {
     android.set(true)
     outputToConsole.set(true)
 }
-
-dependencies {
-    api(project(":core:language-support"))
-}

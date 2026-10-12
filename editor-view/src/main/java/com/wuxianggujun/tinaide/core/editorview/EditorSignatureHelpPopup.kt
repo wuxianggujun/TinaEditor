@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 
 private const val SIGNATURE_HELP_MAX_VISIBLE_OVERLOADS = 3
 internal const val SIGNATURE_HELP_POPUP_TAG = "editor_signature_help_popup"

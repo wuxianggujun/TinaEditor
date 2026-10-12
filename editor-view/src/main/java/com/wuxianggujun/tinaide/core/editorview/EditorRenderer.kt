@@ -160,8 +160,8 @@ internal class EditorRenderer(
         val frameContext = frameContext(state, viewport)
 
         val cursorLine = state.cursorPosition.line
-        val foldEndLineInfo = if (state.isFoldEndLineVirtuallyVisible(cursorLine)) {
-            val ownerStart = state.foldOwnerForEndLine(cursorLine)
+        val foldEndLineInfo = if (state.folding.isFoldEndLineVirtuallyVisible(cursorLine)) {
+            val ownerStart = state.folding.foldOwnerForEndLine(cursorLine)
             if (ownerStart >= 0) {
                 textRenderer.ensureBadgeMetrics(textPaint)
                 val startLineText = frameContext.lineText(ownerStart)
@@ -318,7 +318,7 @@ internal class EditorRenderer(
             textRenderer.badgeMargin + textRenderer.badgeWidth + textRenderer.badgeMargin
         if (contentX < endLineTextStartX) return -1
 
-        val endLine = state.collapsedFoldEndLine(foldStartLine)
+        val endLine = state.folding.collapsedFoldEndLine(foldStartLine)
         if (endLine < 0 || endLine >= state.textBuffer.lineCount) return -1
 
         val endLineText = textRenderer.lineText(state, endLine)

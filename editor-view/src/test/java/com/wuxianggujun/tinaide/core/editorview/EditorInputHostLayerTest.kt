@@ -69,8 +69,8 @@ class EditorInputHostLayerTest {
         composeRule.waitForIdle()
 
         assertThat(state.isFocused).isFalse()
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.completionUiState).isEqualTo(CompletionUiState.Hidden)
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.completionUiState).isEqualTo(CompletionUiState.Hidden)
         assertThat(contextMenuVisibility).containsExactly(false)
     }
 
@@ -120,8 +120,8 @@ class EditorInputHostLayerTest {
         composeRule.waitForIdle()
 
         assertThat(state.isFocused).isFalse()
-        assertThat(state.showCompletion).isFalse()
-        assertThat(state.completionUiState).isEqualTo(CompletionUiState.Hidden)
+        assertThat(state.completion.showCompletion).isFalse()
+        assertThat(state.completion.completionUiState).isEqualTo(CompletionUiState.Hidden)
         assertThat(contextMenuVisibility).containsExactly(false)
     }
 
@@ -171,8 +171,8 @@ class EditorInputHostLayerTest {
         composeRule.waitForIdle()
 
         assertThat(state.isFocused).isTrue()
-        assertThat(state.showCompletion).isTrue()
-        assertThat(state.completionUiState)
+        assertThat(state.completion.showCompletion).isTrue()
+        assertThat(state.completion.completionUiState)
             .isInstanceOf(CompletionUiState.Visible::class.java)
         assertThat(contextMenuVisibility).isEmpty()
     }

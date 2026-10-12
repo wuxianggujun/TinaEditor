@@ -1,5 +1,6 @@
 package com.wuxianggujun.tinaide.core.editorview
 
+import com.wuxianggujun.tinaide.core.editorapi.SemanticToken
 import android.graphics.Typeface
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
@@ -8,11 +9,12 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.wuxianggujun.tinaide.core.editorapi.EditorFontSize
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 import com.wuxianggujun.tinaide.core.textengine.Position
 import com.wuxianggujun.tinaide.core.textengine.TextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextBufferClosedException
 import com.wuxianggujun.tinaide.core.textengine.TextChange
+import com.wuxianggujun.tinaide.core.textengine.TextChangeListener
 import com.wuxianggujun.tinaide.core.textengine.TextScanKernel
 import com.wuxianggujun.tinaide.core.textengine.WordBounds
 import com.wuxianggujun.tinaide.core.treesitter.SyntaxHighlighter
@@ -30,19 +32,18 @@ import timber.log.Timber
 
 @Stable
 class EditorState(
-    override val textBuffer: TextBuffer,
+    val textBuffer: TextBuffer,
     file: File? = null,
-    val projectRootPath: String? = null,
     config: EditorConfig = EditorConfig(),
     val runtimeOptions: EditorRuntimeOptions = EditorRuntimeOptions()
-) : EditorStateSnapshot,
-    EditorEditOperations {
+) : AutoCloseable {
     private companion object {
         private const val SLOW_OPERATION_THRESHOLD_MS = 16L
         private const val SLOW_OPERATION_LOG_INTERVAL_MS = 800L
     }
 
     private var lastSlowOperationLogAtMs: Long = 0L
+    private var closed = false
 
     var file by mutableStateOf(file)
         private set
@@ -69,7 +70,7 @@ class EditorState(
         file = newFile
     }
 
-    override var cursorOffset: Int
+    var cursorOffset: Int
         get() = documentState.selectionSet.primary.caret
         set(value) {
             val current = documentState.selectionSet
@@ -84,7 +85,7 @@ class EditorState(
             )
         }
 
-    override var selectionRange: OffsetRange?
+    var selectionRange: OffsetRange?
         get() = documentState.primarySelectionActive.takeIf { it }?.let {
             documentState.selectionSet.primary
         }
@@ -246,7 +247,7 @@ class EditorState(
      * - Sora 的做法是：缩放过程中冻结 wordwrap 布局，结束后再重建并做一次锚点回推。
      *
      * 这里用 frozenWordWrapColumns 实现同样的冻结效果：
-     * - frozen != null 时，visualLineMap() 使用 frozen 的 wrapColumns（保持视觉行分段不变）
+     * - frozen != null 时，visualLineMapper.visualLineMap() 使用 frozen 的 wrapColumns（保持视觉行分段不变）
      * - 缩放结束后清空 frozen，按新度量重新分段，并在同一次提交中结合 [ScaleAnchor] 对齐
      */
     internal var frozenWordWrapColumns by mutableStateOf<Int?>(null)
@@ -329,12 +330,12 @@ class EditorState(
 
             override fun lineVisualColumns(lineText: String): Int = lineVisualColumnsForWidth(lineText)
 
-            override fun currentVisualLineMap(): EditorVisualLineMapper.VisualLineMap = visualLineMap()
+            override fun currentVisualLineMap(): EditorVisualLineMapper.VisualLineMap = visualLineMapper.visualLineMap()
 
             override fun resolveVisibleIndexForVisualLine(
                 map: EditorVisualLineMapper.VisualLineMap,
                 visualLine: Int
-            ): Int = this@EditorState.resolveVisibleIndexForVisualLine(map, visualLine)
+            ): Int = visualLineMapper.resolveVisibleIndexForVisualLine(map, visualLine)
 
             override fun maxInlayExpandedLineVisualColumns(): Int =
                 this@EditorState.maxInlayExpandedLineVisualColumns()
@@ -353,20 +354,16 @@ class EditorState(
             override val tabSize: Int get() = this@EditorState.config.tabSize
             override val codeFoldingEnabled: Boolean get() = this@EditorState.config.codeFolding
             override val frozenWordWrapColumns: Int? get() = this@EditorState.frozenWordWrapColumns
-            override val foldRegionsDocumentVersion: Long get() = foldingManager.foldRegionsDocumentVersion
-            override val foldDataVersion: Int get() = foldingManager.foldDataVersion
+            override val foldRegionsDocumentVersion: Long get() = folding.foldRegionsDocumentVersion
+            override val foldDataVersion: Int get() = folding.foldDataVersion
             override val inlayHintsVersion: Long get() = this@EditorState.inlayHintsVersion
             override val inlayHintsByLine: Map<Int, List<EditorInlayHint>>
                 get() = if (inlayHintsDocumentVersion == textBuffer.version) this@EditorState.inlayHintsByLine else emptyMap()
-            override fun lineMap(): EditorFoldingManager.LineMap = foldingManager.lineMap()
+            override fun lineMap(): EditorFoldingManager.LineMap = folding.lineMap()
         }
     )
 
-    // 代码折叠（按行隐藏 + 折叠映射 LineMap）委托给 [EditorFoldingManager]：该类维护折叠区间数据、
-    // 折叠映射缓存与全部折叠查询/切换 API，行为与原内联实现严格一致。foldDataVersion 等仍由
-    // mutableStateOf 承载，Compose 跨对象读取仍能触发重组（见该类文档说明）。EditorState 保留瘦委托，
-    // 使模块内 16+ 文件经 state.x() 的调用点零改动。
-    private val foldingManager = EditorFoldingManager(
+    val folding = EditorFoldingManager(
         object : EditorFoldingManager.Host {
             override val textBuffer: TextBuffer get() = this@EditorState.textBuffer
             override val codeFoldingEnabled: Boolean get() = this@EditorState.config.codeFolding
@@ -380,11 +377,7 @@ class EditorState(
         }
     )
 
-    // Hover / SignatureHelp 状态机委托给 [EditorHoverSignatureController]：两块彼此独立、只共享
-    // cursorPosition，与补全/snippet 无耦合。UiState 仍由 mutableStateOf 承载，Compose 跨对象读取
-    // 仍能触发重组（见该类文档说明）。EditorState 保留瘦委托与 get-only 镜像属性，使模块内 9+ 文件
-    // 经 state.x 的读取与 4 个测试 fixture 调用点零改动。
-    private val hoverSignatureController = EditorHoverSignatureController(
+    internal val assistance = EditorHoverSignatureController(
         object : EditorHoverSignatureController.Host {
             override val cursorPosition: Position get() = this@EditorState.cursorPosition
             override val onRequestHover: (suspend (Position) -> String?)? get() = this@EditorState.onRequestHover
@@ -393,13 +386,7 @@ class EditorState(
         }
     )
 
-    // 补全 + snippet 状态机委托给 [EditorCompletionController]：两块双向耦合（snippet 占位符聚焦弹出
-    // choice 补全、取消 snippet 关闭补全、请求补全清除 snippet choice 标记），整体抽出最干净，互调在
-    // 该类内变成普通方法调用。补全状态字段仍由 mutableStateOf 承载，Compose 跨对象读取仍触发重组。
-    // EditorState 保留瘦委托与 get-only 镜像属性，使模块内多个 Compose 文件与测试调用点零改动。
-    // 注意：applyCompletion 仍保留在本类（editorApplyCompletion 接收整个 EditorState，避免透传），
-    // completionQueryFromCursor 也保留在本类（有独立测试且被交互控制器复用），二者经 Host 回调暴露。
-    private val completionController = EditorCompletionController(
+    internal val completion = EditorCompletionController(
         object : EditorCompletionController.Host {
             override val textBuffer: TextBuffer get() = this@EditorState.textBuffer
             override val cursorPosition: Position get() = this@EditorState.cursorPosition
@@ -420,48 +407,25 @@ class EditorState(
         }
     )
 
-    // 补全 + snippet 状态委托给 [completionController]（见上方构造）。以下为 get-only 委托，使模块内
-    // 多个 Compose 文件与测试经 state.x 的直接读取零改动。Compose 跨对象读取这些 mutableState 仍触发重组。
-    val completionItems: List<EditorCompletionItem> get() = completionController.completionItems
-    val completionSelectedIndex: Int get() = completionController.completionSelectedIndex
-    val completionQuery: String get() = completionController.completionQuery
-    val completionUiState: CompletionUiState get() = completionController.completionUiState
-    val showCompletion: Boolean get() = completionController.showCompletion
-    internal val cachedCompletionResults: List<EditorCompletionItem>
-        get() = completionController.cachedCompletionResults
-    internal val cachedCompletionPrefix: String get() = completionController.cachedCompletionPrefix
-    internal val snippetChoiceCompletionActive: Boolean get() = completionController.snippetChoiceCompletionActive
-    internal val activeSnippetSession: SnippetSession? get() = completionController.activeSnippetSession
-    // Hover / SignatureHelp 状态机委托给 [hoverSignatureController]（见上方构造）。以下为 get-only 委托，
-    // 使模块内 9+ 文件经 state.x 的直接读取与 4 个 hover/signature 测试调用点零改动。Compose 跨对象读取
-    // 这些 mutableState 仍触发重组（见该类文档说明）。
-    val hoverUiState: HoverUiState get() = hoverSignatureController.hoverUiState
-    val signatureHelpUiState: SignatureHelpUiState get() = hoverSignatureController.signatureHelpUiState
-    val signatureHelpSelectedSignatureIndex: Int? get() = hoverSignatureController.signatureHelpSelectedSignatureIndex
-
-    // Hover / SignatureHelp 的 publish* 入口委托给 [hoverSignatureController]：保留以下 internal 瘦委托，
-    // 使模块内测试 fixture（seedVisibleHover / seedVisibleSignatureHelp / seedLoadingSignatureHelp）零改动。
-    internal fun publishHoverVisible(markdown: String) =
-        hoverSignatureController.publishHoverVisible(markdown)
-
-    internal fun publishSignatureHelpLoading(
-        previousResult: SignatureHelpResult?,
-        requestId: Long,
-        selectedIndex: Int? = signatureHelpSelectedSignatureIndex
-    ) = hoverSignatureController.publishSignatureHelpLoading(previousResult, requestId, selectedIndex)
-
-    internal fun publishSignatureHelpVisible(
-        result: SignatureHelpResult,
-        requestId: Long,
-        selectedIndex: Int? = signatureHelpSelectedSignatureIndex
-    ) = hoverSignatureController.publishSignatureHelpVisible(result, requestId, selectedIndex)
-
     /**
      * Optional syntax highlighting, independent of language-service callbacks.
      * Null keeps this editor unhighlighted; constructing EditorState never creates
-     * a Tree-sitter parser. The injecting owner manages the highlighter's lifetime.
+     * a Tree-sitter parser. The owner opens/disposes the highlighter; EditorState
+     * owns its update subscription and forwards the document's change stream.
      */
-    var highlighter by mutableStateOf<SyntaxHighlighter?>(null)
+    private var syntaxHighlighter by mutableStateOf<SyntaxHighlighter?>(null)
+    private var highlightedDocumentVersion = textBuffer.version
+    var highlighter: SyntaxHighlighter?
+        get() = syntaxHighlighter
+        set(value) {
+            check(!closed || value == null) { "Cannot attach a highlighter to a closed editor" }
+            if (syntaxHighlighter === value) return
+            syntaxHighlighter?.setOnStateUpdated(null)
+            syntaxHighlighter = value
+            highlightedDocumentVersion = textBuffer.version
+            value?.setOnStateUpdated { if (!closed) notifyHighlightChanged() }
+            notifyHighlightChanged()
+        }
     var semanticTokens by mutableStateOf<List<SemanticToken>>(emptyList())
     var semanticTokensByLine by mutableStateOf<Map<Int, List<SemanticToken>>>(emptyMap())
     var inlayHints by mutableStateOf<List<EditorInlayHint>>(emptyList())
@@ -735,7 +699,6 @@ class EditorState(
         bumpStylingVersion()
     }
 
-    // 代码折叠相关数据/映射/查询均已迁入 [foldingManager]（见上方构造），EditorState 仅保留瘦委托。
 
     var useRelativeLineNumbers by mutableStateOf(config.useRelativeLineNumbers)
 
@@ -784,9 +747,9 @@ class EditorState(
         @Suppress("UNUSED_EXPRESSION")
         textVersion
         // 依赖 foldDataVersion 以确保折叠状态变化时重新计算
-        // （读 foldingManager.foldDataVersion：Compose 快照按 StateObject 身份记录读取，跨对象仍触发重组）
+        // （读 folding.foldDataVersion：Compose 快照按 StateObject 身份记录读取，跨对象仍触发重组）
         @Suppress("UNUSED_EXPRESSION")
-        foldingManager.foldDataVersion
+        folding.foldDataVersion
         // 依赖 config.codeFolding，避免开关变化后 visibleLines 不刷新
         @Suppress("UNUSED_EXPRESSION")
         config.codeFolding
@@ -837,25 +800,25 @@ class EditorState(
     }
 
     internal fun docLineForVisualLine(visualLine: Int): Int {
-        val map = visualLineMap()
+        val map = visualLineMapper.visualLineMap()
         if (map.visualLineCount <= 0) return 0
         val safeVisual = visualLine.coerceIn(0, map.visualLineCount - 1)
-        val visibleIndex = resolveVisibleIndexForVisualLine(map, safeVisual)
+        val visibleIndex = visualLineMapper.resolveVisibleIndexForVisualLine(map, safeVisual)
         return map.visibleDocLines.getOrElse(visibleIndex) { 0 }
     }
 
     internal fun visualLineForDocLine(docLine: Int): Int {
-        val map = visualLineMap()
+        val map = visualLineMapper.visualLineMap()
         if (map.visibleDocLineCount <= 0) return 0
-        val visibleIndex = resolveVisibleIndexForDocLine(docLine)
+        val visibleIndex = visualLineMapper.resolveVisibleIndexForDocLine(docLine)
         if (visibleIndex < 0) return 0
         return map.firstVisualLineAt(visibleIndex)
     }
 
     internal fun visualLineForPosition(line: Int, column: Int): Int {
-        val map = visualLineMap()
+        val map = visualLineMapper.visualLineMap()
         if (map.visibleDocLineCount <= 0 || map.visualLineCount <= 0) return 0
-        val visibleIndex = resolveVisibleIndexForDocLine(line)
+        val visibleIndex = visualLineMapper.resolveVisibleIndexForDocLine(line)
         if (visibleIndex < 0) return 0
         val firstVisual = map.firstVisualLineAt(visibleIndex)
         if (!map.wordWrapEnabled) {
@@ -878,10 +841,10 @@ class EditorState(
     }
 
     internal fun visualLineStartColumn(visualLine: Int): Int {
-        val map = visualLineMap()
+        val map = visualLineMapper.visualLineMap()
         if (!map.wordWrapEnabled || map.visualLineCount <= 0) return 0
         val safeVisual = visualLine.coerceIn(0, map.visualLineCount - 1)
-        val visibleIndex = resolveVisibleIndexForVisualLine(map, safeVisual)
+        val visibleIndex = visualLineMapper.resolveVisibleIndexForVisualLine(map, safeVisual)
         val docLine = map.visibleDocLines.getOrElse(visibleIndex) { 0 }
         val lineText = textBuffer.getLine(docLine)
         val firstVisual = map.firstVisualLineAt(visibleIndex)
@@ -898,13 +861,13 @@ class EditorState(
     }
 
     internal fun visualLineEndColumn(visualLine: Int): Int {
-        val map = visualLineMap()
+        val map = visualLineMapper.visualLineMap()
         if (!map.wordWrapEnabled || map.visualLineCount <= 0) {
             val docLine = docLineForVisualLine(visualLine)
             return textBuffer.getLine(docLine).length
         }
         val safeVisual = visualLine.coerceIn(0, map.visualLineCount - 1)
-        val visibleIndex = resolveVisibleIndexForVisualLine(map, safeVisual)
+        val visibleIndex = visualLineMapper.resolveVisibleIndexForVisualLine(map, safeVisual)
         val docLine = map.visibleDocLines.getOrElse(visibleIndex) { 0 }
         val lineText = textBuffer.getLine(docLine)
         val firstVisual = map.firstVisualLineAt(visibleIndex)
@@ -921,10 +884,6 @@ class EditorState(
     }
 
     internal fun isVisualLineContinuation(visualLine: Int): Boolean = visualLineStartColumn(visualLine) > 0
-
-    internal fun isDocLineHidden(docLine: Int): Boolean = foldingManager.isDocLineHidden(docLine)
-
-    internal fun visibleDocumentLineMap(): EditorFoldingManager.LineMap = foldingManager.lineMap()
 
     internal fun visualLineTopInViewport(visualLine: Int): Float {
         val firstLineOffset = scrollOffsetPx - firstVisibleLine * lineHeightPx
@@ -1038,7 +997,7 @@ class EditorState(
     fun scrollToLine(line: Int) {
         val oldX = scrollOffsetXPx
         val oldY = scrollOffsetPx
-        val visualLine = resolveVisualLineForDocLine(line)
+        val visualLine = visualLineForDocLine(line)
         scrollOffsetPx = (visualLine * lineHeightPx).coerceIn(0f, maxScrollPx())
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
     }
@@ -1055,7 +1014,7 @@ class EditorState(
         emitScrollChangedIfNeeded(oldX = oldX, oldY = oldY)
     }
 
-    override fun moveCursorTo(offset: Int, clearSelection: Boolean) {
+    fun moveCursorTo(offset: Int, clearSelection: Boolean = true) {
         val oldCursor = cursorOffset
         val oldSelection = selectionRange
         val oldSelectionSet = selectionSet
@@ -1073,7 +1032,7 @@ class EditorState(
             preferAfter = true
         )
         val pos = textBuffer.offsetToPosition(safeOffset)
-        revealLineIfFolded(pos.line)
+        folding.revealLineIfFolded(pos.line)
         val clampedOffset = safeOffset.coerceIn(0, textBuffer.length)
         cursorOffset = clampedOffset
         val curPos = if (clampedOffset == safeOffset) pos else textBuffer.offsetToPosition(clampedOffset)
@@ -1190,7 +1149,7 @@ class EditorState(
         )
         if (ensureVisible) {
             val position = textBuffer.offsetToPosition(primary.caret)
-            revealLineIfFolded(position.line)
+            folding.revealLineIfFolded(position.line)
             ensureCursorVisible(position.line, position.column)
         }
         if (isFocused) {
@@ -1271,7 +1230,7 @@ class EditorState(
     }
 
     internal fun visualLineFromViewportY(yPx: Float): Int {
-        val map = visualLineMap()
+        val map = visualLineMapper.visualLineMap()
         if (map.visualLineCount <= 0) return 0
         return ((yPx + scrollOffsetPx) / lineHeightPx).toInt()
             .coerceIn(0, (map.visualLineCount - 1).coerceAtLeast(0))
@@ -1299,7 +1258,7 @@ class EditorState(
         onGutterLongPress?.invoke(line)
     }
 
-    override fun insert(text: String) {
+    fun insert(text: String) {
         editorInsert(this, text)
     }
 
@@ -1329,11 +1288,11 @@ class EditorState(
         return changed || resolved.cursorOffsetAfterInsert != null
     }
 
-    override fun backspace() {
+    fun backspace() {
         editorBackspace(this)
     }
 
-    override fun deleteForward() {
+    fun deleteForward() {
         editorDeleteForward(this)
     }
 
@@ -1348,7 +1307,7 @@ class EditorState(
         if (cursorOffset <= 0) return
         val step = editorUnitLengthBefore(textBuffer, cursorOffset)
         moveCursorToWithOptionalSelection(
-            offset = skipFoldBackwardIfHidden(cursorOffset - step),
+            offset = folding.skipFoldBackwardIfHidden(cursorOffset - step),
             extendSelection = extendSelection
         )
     }
@@ -1364,23 +1323,10 @@ class EditorState(
         if (cursorOffset >= textBuffer.length) return
         val step = editorUnitLengthAfter(textBuffer, cursorOffset)
         moveCursorToWithOptionalSelection(
-            offset = skipFoldForwardIfHidden(cursorOffset + step),
+            offset = folding.skipFoldForwardIfHidden(cursorOffset + step),
             extendSelection = extendSelection
         )
     }
-
-    /**
-     * 向右移动时跳过折叠内部隐藏行。
-     * 折叠末行是虚拟可见的（光标可以停留），但折叠内部行（startLine+1..endLine-1）不可停留。
-     */
-    private fun skipFoldForwardIfHidden(offset: Int): Int = foldingManager.skipFoldForwardIfHidden(offset)
-
-    /**
-     * 向左移动时跳过折叠内部隐藏行。
-     * 从折叠末行可见文本的起始位置再往左 → 跳回折叠起始行末尾。
-     * 从折叠内部行 → 跳回折叠起始行末尾。
-     */
-    private fun skipFoldBackwardIfHidden(offset: Int): Int = foldingManager.skipFoldBackwardIfHidden(offset)
 
     fun moveUp(extendSelection: Boolean = false) {
         val pos = textBuffer.offsetToPosition(cursorOffset.coerceIn(0, textBuffer.length))
@@ -1427,7 +1373,7 @@ class EditorState(
         scrollToLine(cursorLine)
     }
 
-    override fun selectRange(startOffset: Int, endOffset: Int) {
+    fun selectRange(startOffset: Int, endOffset: Int) {
         selectRangeInternal(
             startOffset = startOffset,
             endOffset = endOffset,
@@ -1540,9 +1486,9 @@ class EditorState(
         }
     }
 
-    override fun replaceSelection(replacement: String): Boolean = editorReplaceSelection(this, replacement)
+    fun replaceSelection(replacement: String): Boolean = editorReplaceSelection(this, replacement)
 
-    override fun replaceRange(
+    fun replaceRange(
         startOffset: Int,
         endOffset: Int,
         replacement: String
@@ -1686,89 +1632,13 @@ class EditorState(
     fun canUndo(): Boolean = textBuffer.canUndo()
     fun canRedo(): Boolean = textBuffer.canRedo()
 
-    override fun undo(): Boolean = editorUndo(this)
+    fun undo(): Boolean = editorUndo(this)
 
-    override fun redo(): Boolean = editorRedo(this)
-
-    // 补全 + snippet 状态机委托给 [completionController]（见上方构造）。以下为瘦委托，使模块内
-    // 多个 Compose 文件、交互控制器、edit-ops 与测试经 state.x() 的调用点零改动。行为与原内联实现
-    // 严格一致（requestId 自增/比对、防竞态返回、缓存置位时机、snippet 偏移与占位符聚焦顺序均逐行对应）。
-    suspend fun requestCompletion(triggerChar: Char? = null) =
-        completionController.requestCompletion(triggerChar)
-
-    suspend fun requestHover(position: Position = cursorPosition) =
-        hoverSignatureController.requestHover(position)
-
-    suspend fun requestSignatureHelp() = hoverSignatureController.requestSignatureHelp()
-
-    fun refilterCompletion() = completionController.refilterCompletion()
-
-    internal fun showInlineCompletionItems(
-        items: List<EditorCompletionItem>,
-        selectedIndex: Int = 0,
-        query: String = "",
-        requestId: Long = 0L,
-        snippetChoiceActive: Boolean = items.isNotEmpty()
-    ) = completionController.showInlineCompletionItems(
-        items = items,
-        selectedIndex = selectedIndex,
-        query = query,
-        requestId = requestId,
-        snippetChoiceActive = snippetChoiceActive
-    )
+    fun redo(): Boolean = editorRedo(this)
 
     fun applyCompletion(item: EditorCompletionItem) {
         editorApplyCompletion(this, item)
     }
-
-    fun moveCompletionSelection(delta: Int): Boolean = completionController.moveCompletionSelection(delta)
-
-    fun setCompletionSelectedIndex(index: Int): Boolean =
-        completionController.setCompletionSelectedIndex(index)
-
-    fun applySelectedCompletion(): Boolean = completionController.applySelectedCompletion()
-
-    fun dismissCompletion() = completionController.dismissCompletion()
-
-    fun dismissHover() = hoverSignatureController.dismissHover()
-
-    fun dismissSignatureHelp() = hoverSignatureController.dismissSignatureHelp()
-
-    fun resolveDisplayedSignatureHelpIndex(result: SignatureHelpResult?): Int =
-        hoverSignatureController.resolveDisplayedSignatureHelpIndex(result)
-
-    fun selectSignatureHelp(index: Int): Boolean = hoverSignatureController.selectSignatureHelp(index)
-
-    fun cycleSignatureHelp(delta: Int): Boolean = hoverSignatureController.cycleSignatureHelp(delta)
-
-    internal fun startSnippetSession(session: SnippetSession) =
-        completionController.startSnippetSession(session)
-
-    /**
-     * Tab 正向跳转：前进到下一个 tabstop。
-     * @return 是否消费了 Tab 键事件
-     */
-    fun advanceSnippet(): Boolean = completionController.advanceSnippet()
-
-    /**
-     * Shift+Tab 反向跳转：退回上一个 tabstop。
-     * @return 是否消费了 Shift+Tab 键事件
-     */
-    fun retreatSnippet(): Boolean = completionController.retreatSnippet()
-
-    fun cancelSnippet() = completionController.cancelSnippet()
-
-    /**
-     * 在 snippet 会话内发生编辑时，同步更新会话中所有占位符的偏移量。
-     *
-     * @param editOffset 编辑发生的绝对文本偏移
-     * @param delta      变化量（插入为正，删除为负）
-     */
-    internal fun adjustSnippetOffsets(editOffset: Int, delta: Int) =
-        completionController.adjustSnippetOffsets(editOffset, delta)
-
-    internal fun updateSnippetSession(session: SnippetSession?) =
-        completionController.updateSnippetSession(session)
 
     fun replaceAll(
         findText: String,
@@ -1917,58 +1787,7 @@ class EditorState(
         }.coerceIn(0f, maxScrollXPx())
     }
 
-    // 代码折叠（按行隐藏）委托给 [EditorFoldingManager]：保留以下瘦委托，使本类高层方法
-    // （moveCursorTo / moveLeft·moveRight 的折叠跳过等）与模块内 16+ 文件经 state.x() 的调用点
-    // 零改动。行为与原内联实现严格一致。
-    fun setFoldRegions(regions: List<FoldRegion>, documentVersion: Long) =
-        foldingManager.setFoldRegions(regions, documentVersion)
-
-    fun clearFoldRegions() = foldingManager.clearFoldRegions()
-
-    fun toggleFoldAtLine(line: Int) = foldingManager.toggleFoldAtLine(line)
-
-    internal fun isFoldCollapsedAtLine(line: Int): Boolean = foldingManager.isFoldCollapsedAtLine(line)
-
-    internal fun isFoldingDataValid(): Boolean = foldingManager.isFoldingDataValid()
-
-    internal fun isCollapsedFoldStart(line: Int): Boolean = foldingManager.isCollapsedFoldStart(line)
-
-    internal fun collapsedFoldEndLine(startLine: Int): Int = foldingManager.collapsedFoldEndLine(startLine)
-
-    internal fun isFoldEndLineVirtuallyVisible(docLine: Int): Boolean =
-        foldingManager.isFoldEndLineVirtuallyVisible(docLine)
-
-    internal fun foldOwnerForEndLine(docLine: Int): Int = foldingManager.foldOwnerForEndLine(docLine)
-
-    internal fun markFoldAsBroken(startLine: Int) = foldingManager.markFoldAsBroken(startLine)
-
-    internal fun foldOwnerForHiddenLine(docLine: Int): Int = foldingManager.foldOwnerForHiddenLine(docLine)
-
-    internal fun hasHiddenDiagnosticsInFold(startLine: Int): Boolean =
-        foldingManager.hasHiddenDiagnosticsInFold(startLine)
-
-    private fun revealLineIfFolded(docLine: Int) = foldingManager.revealLineIfFolded(docLine)
-
-    private fun resolveVisualLineForDocLine(docLine: Int): Int = visualLineForDocLine(docLine)
-
-    internal fun visualLineCount(): Int = visualLineMap().visualLineCount.coerceAtLeast(0)
-
-    // 视觉行映射（folding + wordWrap）委托给 [EditorVisualLineMapper]：保留以下瘦委托，
-    // 使 EditorState 内的高层方法（docLineForVisualLine / visualLineForPosition / 渲染口径等）
-    // 调用点零改动。行为与原内联实现严格一致。
-    private fun visualLineMap(): EditorVisualLineMapper.VisualLineMap = visualLineMapper.visualLineMap()
-
-    private fun resolveVisibleIndexForVisualLine(
-        map: EditorVisualLineMapper.VisualLineMap,
-        visualLine: Int
-    ): Int = visualLineMapper.resolveVisibleIndexForVisualLine(map, visualLine)
-
-    private fun resolveVisibleIndexForDocLine(docLine: Int): Int =
-        visualLineMapper.resolveVisibleIndexForDocLine(docLine)
-
-    private fun applyTextChangeToDocSegmentCounts(change: TextChange, newVersion: Long) {
-        visualLineMapper.applyTextChangeToDocSegmentCounts(change, newVersion)
-    }
+    internal fun visualLineCount(): Int = visualLineMapper.visualLineMap().visualLineCount.coerceAtLeast(0)
 
     private fun lineVisualColumnsForWidth(lineText: String): Int = TextScanKernel.measureVisualColumns(lineText, config.tabSize)
 
@@ -2025,8 +1844,6 @@ class EditorState(
     internal fun <T> traceSlowOperation(operation: String, block: () -> T): T = traceIfSlow(operation, block)
 
     internal fun emitTextChanged(reason: String) {
-        textVersion = textBuffer.version
-        markObservableStateChanged()
         emitEvent(
             EditorEvent.TextChanged(
                 reason = reason,
@@ -2036,16 +1853,16 @@ class EditorState(
         )
     }
 
-    fun applyTextBufferChange(change: TextChange) {
+    private fun applyTextBufferChange(change: TextChange) {
         val currentVersion = textBuffer.version
         textVersion = currentVersion
         applyTextChangeToInlayHints(change)
         applyTextChangeToSemanticTokens(change)
-        foldingManager.adjustFoldRegionsAfterTextChange(change, currentVersion)
+        folding.adjustFoldRegionsAfterTextChange(change, currentVersion)
         applyWidthSnapshotChange(change, currentVersion)
         wordWrapLayoutCache.applyTextChange(change, currentVersion)
         // segment count 与完整 wrap layout 分开维护；这里只基于当前文本重算编辑窗内的行。
-        applyTextChangeToDocSegmentCounts(change, currentVersion)
+        visualLineMapper.applyTextChangeToDocSegmentCounts(change, currentVersion)
         normalizeInteractionOffsetsAfterTextChange()
         markObservableStateChanged()
     }
@@ -2151,6 +1968,48 @@ class EditorState(
                 offsetY = scrollOffsetPx
             )
         )
+    }
+
+    // Buffer callbacks must run on the editor's owner thread. The Android host
+    // supplies a main-thread changeExecutor; headless callers can stay synchronous.
+    private val documentChangeListener = TextChangeListener { change ->
+        if (!closed && !textBuffer.isClosed) {
+            highlighter?.let { highlighter ->
+                if (change.documentVersion > highlightedDocumentVersion) {
+                    if (change.hasCompleteNewText) {
+                        highlighter.applyTextChange(change)
+                        highlightedDocumentVersion = change.documentVersion
+                    } else {
+                        highlighter.openDocument(textBuffer.substring(0, textBuffer.length))
+                        highlightedDocumentVersion = textBuffer.version
+                    }
+                }
+            }
+            applyTextBufferChange(change)
+        }
+    }
+
+    init {
+        textBuffer.addChangeListener(documentChangeListener)
+    }
+
+    /** Detach document/services before the owner releases its buffer and providers. */
+    override fun close() {
+        if (closed) return
+        closed = true
+        textBuffer.removeChangeListener(documentChangeListener)
+        highlighter = null
+        completion.dismissCompletion()
+        completion.cancelSnippet()
+        assistance.dismissHover()
+        assistance.dismissSignatureHelp()
+        onRequestCompletion = null
+        onRequestHover = null
+        onRequestSignatureHelp = null
+        onRequestGotoDefinition = null
+        onRequestFindReferences = null
+        onRequestRenameSymbol = null
+        onRequestCodeActions = null
     }
 }
 

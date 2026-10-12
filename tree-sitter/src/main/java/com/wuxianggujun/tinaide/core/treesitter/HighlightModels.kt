@@ -30,20 +30,14 @@ data class HighlightSpan(
 const val DEFAULT_HIGHLIGHT_PRIORITY: Int = 100
 
 interface SyntaxHighlighter {
-    fun highlight(text: String, visibleRange: IntRange): List<HighlightSpan>
     fun openDocument(text: String) {}
 
     /**
      * 同步打开文档：调用返回时高亮快照应已就绪，首帧渲染不再闪默认色。
-     * 调用方必须在 IO/Default 线程调用；默认实现回退到异步 openDocument。
+     * 调用方必须在 IO/Default 线程调用。
      */
-    fun openDocumentBlocking(text: String) {
-        openDocument(text)
-    }
+    fun openDocumentBlocking(text: String)
     fun applyTextChange(change: TextChange) {}
-    fun applyTextChange(change: TextChange, newText: String) {
-        applyTextChange(change)
-    }
     /** Cache-only read. A miss schedules background work and notifies [setOnStateUpdated] when ready. */
     fun getLineSegments(line: Int): List<HighlightLineSegment> = emptyList()
     fun setOnStateUpdated(callback: (() -> Unit)?) {}

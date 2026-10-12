@@ -204,14 +204,6 @@ internal class IncrementalTreeSitterHighlightState(
         }
     }
 
-    fun applyTextChange(change: TextChange) {
-        applyTextChangeInternal(change = change, forcedText = null)
-    }
-
-    fun applyTextChange(change: TextChange, newText: String) {
-        applyTextChangeInternal(change = change, forcedText = newText)
-    }
-
     fun getLineSegments(line: Int): List<HighlightLineSegment> {
         synchronized(lock) {
             if (disposed || line !in 0 until currentLineCount) return emptyList()
@@ -362,35 +354,19 @@ internal class IncrementalTreeSitterHighlightState(
         enqueueWorkerTreeCleanup(tree)
     }
 
-    private fun applyTextChangeInternal(change: TextChange, forcedText: String?) {
+    fun applyTextChange(change: TextChange) {
         var shouldSchedule = false
         var shouldClear = false
         synchronized(lock) {
             if (disposed) return
-            val updatedLength = when {
-                forcedText != null -> {
-                    currentText = StringBuilder(forcedText)
-                    forcedText.length
-                }
-
-                currentText != null -> {
-                    applyChangeToText(currentText!!, change)
-                    currentText!!.length
-                }
-
-                else -> return
-            }
-            if (updatedLength == 0) {
+            val text = currentText ?: return
+            applyChangeToText(text, change)
+            if (text.isEmpty()) {
                 shouldClear = true
                 return@synchronized
             }
 
-            if (forcedText != null) {
-                currentLineCount = buildLineStartOffsets(forcedText).size
-            } else {
-                val lineDelta = change.lineDelta
-                currentLineCount = (currentLineCount + lineDelta).coerceAtLeast(1)
-            }
+            currentLineCount = (currentLineCount + change.lineDelta).coerceAtLeast(1)
 
             pendingLineRequests.clear()
             revision++

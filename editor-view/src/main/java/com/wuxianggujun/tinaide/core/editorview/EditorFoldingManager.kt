@@ -13,13 +13,11 @@ import timber.log.Timber
 /**
  * 代码折叠管理器（按行隐藏）。
  *
- * 从 [EditorState] 抽出的内聚块：维护折叠区间数据（[foldRegions] / [collapsedFoldStartLines] 等），
+ * 维护折叠区间数据（[foldRegions] / [collapsedFoldStartLines] 等），
  * 计算“文档行 → 视觉行”的折叠映射 [LineMap]（含缓存），并提供全部折叠查询与切换 API。
  *
  * 该块依赖宿主的少量只读量（文本、折叠/Tab 开关、gutter 装饰、诊断行索引、光标偏移）以及
  * 少量回调（移动光标、夹取滚动），因此通过 [Host] 接口注入，组合而非继承（D 依赖倒置）。
- *
- * 行为与原内联实现严格一致：算法、缓存失效时机、版本置位时机均逐行对应原 [EditorState] 实现。
  *
  * 可观察性说明：
  * - [foldDataVersion] / [foldRegionsDocumentVersion] / [foldRegions] / [collapsedFoldStartLines]
@@ -27,7 +25,7 @@ import timber.log.Timber
  *   因此 [EditorState] 的 `visibleLines` derivedStateOf 跨对象读取 [foldDataVersion]（直接读 +
  *   经 visualLineMap() 间接读）仍会触发重组，无需在宿主侧保留镜像状态。
  */
-internal class EditorFoldingManager(
+class EditorFoldingManager internal constructor(
     private val host: Host
 ) {
     /**
@@ -368,7 +366,7 @@ internal class EditorFoldingManager(
         }
     }
 
-    fun lineMap(): LineMap {
+    internal fun lineMap(): LineMap {
         val foldingEnabled = host.codeFoldingEnabled && foldRegionsDocumentVersion == textBuffer.version
         val docLineCount = textBuffer.lineCount
         val cached = lineMapCache

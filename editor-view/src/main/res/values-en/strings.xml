@@ -29,7 +29,7 @@
     <string name="editor_find_replace">Replace</string>
     <string name="editor_find_replacement">Replace with</string>
     <string name="editor_find_replace_all">Replace all</string>
-    <string name="editor_find_invalid_query">Invalid regular expression</string>
+    <string name="editor_find_invalid_query">Invalid or unsupported RE2 expression (lookaround and backreferences are not supported)</string>
     <string name="editor_find_invalid_replacement">Invalid replacement expression or capture group</string>
     <string name="editor_cursor_above">Add cursor above</string>
     <string name="editor_cursor_below">Add cursor below</string>

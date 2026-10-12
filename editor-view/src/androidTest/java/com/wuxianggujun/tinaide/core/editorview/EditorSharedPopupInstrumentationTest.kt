@@ -31,7 +31,7 @@ class EditorSharedPopupInstrumentationTest {
 
         composeRule.setContent {
             EditorSignatureHelpPopup(
-                result = com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult(
+                result = com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult(
                     signatures = listOf(
                         "sig(Int count, String first)",
                         "sig(Int count, Boolean enabled)"

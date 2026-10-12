@@ -53,7 +53,7 @@ internal fun applyMultiCursorEditPlan(
     if (plan.isEmpty) return false
     val selectionBefore = state.selectionSet
     val selectionAfter = plan.resultingSelections
-    state.cancelSnippet()
+    state.completion.cancelSnippet()
     state.textBuffer.editTransaction(
         cursorBefore = selectionBefore.primary.caret,
         cursorAfter = { selectionAfter.primary.caret },

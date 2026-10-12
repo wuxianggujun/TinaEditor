@@ -29,7 +29,7 @@
     <string name="editor_find_replace">替换</string>
     <string name="editor_find_replacement">替换为</string>
     <string name="editor_find_replace_all">全部替换</string>
-    <string name="editor_find_invalid_query">正则表达式无效</string>
+    <string name="editor_find_invalid_query">正则表达式无效或不受 RE2 支持（不支持环视和反向引用）</string>
     <string name="editor_find_invalid_replacement">替换表达式或捕获组无效</string>
     <string name="editor_cursor_above">在上一行添加光标</string>
     <string name="editor_cursor_below">在下一行添加光标</string>

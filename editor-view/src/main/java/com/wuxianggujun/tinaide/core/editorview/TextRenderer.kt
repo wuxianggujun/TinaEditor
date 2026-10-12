@@ -12,12 +12,6 @@ import com.wuxianggujun.tinaide.core.treesitter.SyntaxHighlighter
 import java.util.LinkedHashMap
 import timber.log.Timber
 
-// 直接复用 TreeSitter 的 HighlightLineSegment 作为渲染侧 cache 元素。
-// 字段完全重合（startColumn / endColumn / type），多出的 priority 渲染侧不用但也无代价。
-// 旧实现每帧 cache miss 都要 `segments.map { LineHighlightSegment(...) }`，再分配一整轮 ArrayList + data class 实例，
-// 新实现直接把 `List<HighlightLineSegment>` 原样放进 cache。
-internal typealias LineHighlightSegment = HighlightLineSegment
-
 internal class TextRenderer {
     internal data class FrameCacheStats(
         val hits: Int,
@@ -32,9 +26,6 @@ internal class TextRenderer {
     private data class CachedLine(
         val text: String
     )
-
-    // 直接复用 TreeSitter 的 HighlightLineSegment（字段完全重合 + 多一个 priority），
-    // 避免每帧 cache miss 对每个片段再 new 一个等价的副本。见文件底部 typealias。
 
     private data class VisibleHighlightCacheKey(
         val highlighter: SyntaxHighlighter,
@@ -71,7 +62,7 @@ internal class TextRenderer {
     // 复用同一个 HashMap：避免每帧 cache miss 都分配新 map 导致 GC stall。
     // 使失效路径只清空 key（不动 map 内容），避免非主线程失效时与主线程 paint 的迭代发生 CME。
     // 下一次 main-thread resolve 命中 key=null 会先 clear 再填充，paint 此时还未开始迭代新结果。
-    private val visibleHighlightCache: HashMap<Int, List<LineHighlightSegment>> = HashMap(256)
+    private val visibleHighlightCache: HashMap<Int, List<HighlightLineSegment>> = HashMap(256)
     private var visibleSemanticCacheKey: VisibleSemanticCacheKey? = null
 
     // 对称复用：与 visibleHighlightCache 同样的策略，失效路径只清 key 不动 map 内容。
@@ -176,7 +167,7 @@ internal class TextRenderer {
                 )
                 val containsTab = tabColumns.isNotEmpty()
                 val foldEndLine = if (visualEndColumn >= lookup.text.length) {
-                    state.collapsedFoldEndLine(line)
+                    state.folding.collapsedFoldEndLine(line)
                 } else {
                     -1
                 }
@@ -615,7 +606,7 @@ internal class TextRenderer {
     internal fun resolveDrawHighlightSegmentsForVisibleWindow(
         state: EditorState,
         visibleLines: IntRange
-    ): Map<Int, List<LineHighlightSegment>> {
+    ): Map<Int, List<HighlightLineSegment>> {
         val highlighter = state.highlighter ?: return emptyMap()
         if (visibleLines.isEmpty()) return emptyMap()
 
@@ -628,7 +619,7 @@ internal class TextRenderer {
         val maxLine = lineCount - 1
         val windowFirstLine = (visibleLines.first - HIGHLIGHT_CACHE_MARGIN_LINES).coerceIn(0, maxLine)
         val windowLastLine = (visibleLines.last + HIGHLIGHT_CACHE_MARGIN_LINES).coerceIn(windowFirstLine, maxLine)
-        val lineMap = state.visibleDocumentLineMap()
+        val lineMap = state.folding.lineMap()
 
         synchronized(cacheLock) {
             val cachedKey = visibleHighlightCacheKey
@@ -652,7 +643,7 @@ internal class TextRenderer {
                 val segments = highlighter.getLineSegments(line)
                 if (segments.isEmpty()) return@forEachVisibleLine
                 // HighlightLineSegment 是 immutable data class，直接复用 highlighter 返回的 List 引用即可，
-                // 不需要再 `.map { LineHighlightSegment(...) }` 分配一轮等价副本。
+                // 不需要再 `.map { HighlightLineSegment(...) }` 分配一轮等价副本。
                 result[line] = segments
             }
             visibleHighlightCacheKey = VisibleHighlightCacheKey(
@@ -678,7 +669,7 @@ internal class TextRenderer {
         val maxLine = (state.textBuffer.lineCount - 1).coerceAtLeast(0)
         val windowFirstLine = (visibleLines.first - HIGHLIGHT_CACHE_MARGIN_LINES).coerceIn(0, maxLine)
         val windowLastLine = (visibleLines.last + HIGHLIGHT_CACHE_MARGIN_LINES).coerceIn(windowFirstLine, maxLine)
-        val lineMap = state.visibleDocumentLineMap()
+        val lineMap = state.folding.lineMap()
 
         synchronized(cacheLock) {
             val cachedKey = visibleSemanticCacheKey

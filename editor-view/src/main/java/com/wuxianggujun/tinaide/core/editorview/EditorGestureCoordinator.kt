@@ -79,11 +79,11 @@ internal class EditorGestureCoordinator(
             }
         }
 
-        if (state.isCollapsedFoldStart(line)) {
+        if (state.folding.isCollapsedFoldStart(line)) {
             val contentX = (viewportX - zones.textStartX + state.scrollOffsetXPx).coerceAtLeast(0f)
             if (renderer.isFoldBadgeHit(line, contentX, state, textPaint)) {
                 gestureHandler.clearTextTapTracking()
-                state.toggleFoldAtLine(line)
+                state.folding.toggleFoldAtLine(line)
                 return
             }
             val foldEndOffset = renderer.resolveFoldEndLineOffset(line, contentX, state, textPaint)

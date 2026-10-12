@@ -1,6 +1,6 @@
 package com.wuxianggujun.tinaide.core.editorview
 
-import com.wuxianggujun.tinaide.core.editorlsp.SignatureHelpResult
+import com.wuxianggujun.tinaide.core.editorapi.SignatureHelpResult
 
 /**
  * Editor completion / hover / signature-help UI state models.

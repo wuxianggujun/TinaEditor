@@ -121,11 +121,11 @@ class EditorStateWordWrapTest {
             config = EditorConfig(wordWrap = false, codeFolding = true)
         ).apply {
             updateMetrics(10f, 1f, 20f, 20f, 0f)
-            setFoldRegions(listOf(FoldRegion(startLine = 0, endLine = 3)), buffer.version)
+            folding.setFoldRegions(listOf(FoldRegion(startLine = 0, endLine = 3)), buffer.version)
         }
         val expandedMaxScroll = state.maxVerticalScrollOffsetPx()
 
-        state.toggleFoldAtLine(0)
+        state.folding.toggleFoldAtLine(0)
 
         assertThat(state.maxVerticalScrollOffsetPx()).isLessThan(expandedMaxScroll)
     }
@@ -136,21 +136,20 @@ class EditorStateWordWrapTest {
         val state = EditorState(buffer, config = EditorConfig(wordWrap = true, codeFolding = true))
         state.updateMetrics(20f, 1f, 240f, 4f, 0f)
         val regions = listOf(FoldRegion(0, 3))
-        state.setFoldRegions(regions, buffer.version)
-        state.toggleFoldAtLine(0)
-        val originalFoldMap = state.visibleDocumentLineMap()
+        state.folding.setFoldRegions(regions, buffer.version)
+        state.folding.toggleFoldAtLine(0)
+        val originalFoldMap = state.folding.lineMap()
         assertThat(state.visualLineCount()).isEqualTo(2)
-        buffer.addChangeListener(state::applyTextBufferChange)
 
         buffer.insert(0, "x")
         assertThat(state.visualLineCount()).isEqualTo(3)
-        repeat(3) { state.setFoldRegions(regions.map { it.copy() }, buffer.version) }
-        assertThat(state.visibleDocumentLineMap()).isSameInstanceAs(originalFoldMap)
+        repeat(3) { state.folding.setFoldRegions(regions.map { it.copy() }, buffer.version) }
+        assertThat(state.folding.lineMap()).isSameInstanceAs(originalFoldMap)
         assertThat(state.visualLineCount()).isEqualTo(3)
         assertThat(state.visualLineForDocLine(4)).isEqualTo(2)
 
-        state.setFoldRegions(listOf(FoldRegion(0, 2)), buffer.version)
-        assertThat(state.visibleDocumentLineMap()).isNotSameInstanceAs(originalFoldMap)
+        state.folding.setFoldRegions(listOf(FoldRegion(0, 2)), buffer.version)
+        assertThat(state.folding.lineMap()).isNotSameInstanceAs(originalFoldMap)
         assertThat(state.visualLineCount()).isEqualTo(4)
     }
 

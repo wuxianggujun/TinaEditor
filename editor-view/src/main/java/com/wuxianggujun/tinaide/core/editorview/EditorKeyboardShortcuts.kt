@@ -43,7 +43,7 @@ internal fun handleEditorShortcut(
         return true
     }
     if (
-        state.signatureHelpUiState !is SignatureHelpUiState.Hidden &&
+        state.assistance.signatureHelpUiState !is SignatureHelpUiState.Hidden &&
         event.isAltPressed &&
         !event.isCtrlPressed &&
         !event.isMetaPressed
@@ -55,7 +55,7 @@ internal fun handleEditorShortcut(
         }
     }
 
-    val completionVisible = when (val uiState = state.completionUiState) {
+    val completionVisible = when (val uiState = state.completion.completionUiState) {
         is CompletionUiState.Visible -> uiState.items.isNotEmpty()
         is CompletionUiState.Loading -> uiState.previousItems.isNotEmpty()
         CompletionUiState.Hidden -> false
@@ -81,12 +81,12 @@ internal fun handleEditorShortcut(
         }
     }
 
-    if (event.key == Key.Escape && state.activeSnippetSession != null) {
-        state.cancelSnippet()
+    if (event.key == Key.Escape && state.completion.activeSnippetSession != null) {
+        state.completion.cancelSnippet()
         return true
     }
 
-    if (event.key == Key.Escape && state.signatureHelpUiState !is SignatureHelpUiState.Hidden) {
+    if (event.key == Key.Escape && state.assistance.signatureHelpUiState !is SignatureHelpUiState.Hidden) {
         onDismissSignatureHelp()
         return true
     }
@@ -124,12 +124,12 @@ internal fun handleEditorShortcut(
         when (event.key) {
             Key.Tab -> {
                 // Shift+Tab：snippet 会话内退回上一个 tabstop
-                if (event.isShiftPressed && state.activeSnippetSession != null) {
-                    return state.retreatSnippet()
+                if (event.isShiftPressed && state.completion.activeSnippetSession != null) {
+                    return state.completion.retreatSnippet()
                 }
                 // Tab：snippet 会话内前进到下一个 tabstop
-                if (!event.isShiftPressed && state.activeSnippetSession != null) {
-                    return state.advanceSnippet()
+                if (!event.isShiftPressed && state.completion.activeSnippetSession != null) {
+                    return state.completion.advanceSnippet()
                 }
 
                 val hasSelection = state.selectionRange?.isEmpty == false

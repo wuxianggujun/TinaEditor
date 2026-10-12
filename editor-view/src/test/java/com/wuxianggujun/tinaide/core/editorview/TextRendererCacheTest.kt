@@ -12,7 +12,6 @@ import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextChange
 import com.wuxianggujun.tinaide.core.treesitter.HighlightLineSegment
-import com.wuxianggujun.tinaide.core.treesitter.HighlightSpan
 import com.wuxianggujun.tinaide.core.treesitter.HighlightType
 import com.wuxianggujun.tinaide.core.treesitter.SyntaxHighlighter
 import com.wuxianggujun.tinaide.core.treesitter.TreeSitterFoldingProvider.FoldRegion
@@ -64,8 +63,8 @@ class TextRendererCacheTest {
     fun foldedWindow_shouldSkipHiddenLinesWithoutExpandingSynchronousRequests() {
         val buffer = RopeTextBuffer((0 until 10_000).joinToString("\n") { "line$it" })
         val state = EditorState(buffer, config = EditorConfig(wordWrap = false)).apply {
-            setFoldRegions(listOf(FoldRegion(100, 9_900)), buffer.version)
-            toggleFoldAtLine(100)
+            folding.setFoldRegions(listOf(FoldRegion(100, 9_900)), buffer.version)
+            folding.toggleFoldAtLine(100)
         }
         val highlighter = CountingSyntaxHighlighter()
         state.highlighter = highlighter
@@ -80,8 +79,8 @@ class TextRendererCacheTest {
     fun unfolding_shouldInvalidateWindowEvenWithoutTextOrHighlightChanges() {
         val buffer = RopeTextBuffer((0 until 300).joinToString("\n") { "line$it" })
         val state = EditorState(buffer, config = EditorConfig(wordWrap = false)).apply {
-            setFoldRegions(listOf(FoldRegion(100, 200)), buffer.version)
-            toggleFoldAtLine(100)
+            folding.setFoldRegions(listOf(FoldRegion(100, 200)), buffer.version)
+            folding.toggleFoldAtLine(100)
         }
         val highlighter = CountingSyntaxHighlighter()
         state.highlighter = highlighter
@@ -89,7 +88,7 @@ class TextRendererCacheTest {
         renderer.resolveDrawHighlightSegmentsForVisibleWindow(state, 90..110)
         assertThat(highlighter.requestedLines).doesNotContain(101)
 
-        state.toggleFoldAtLine(100)
+        state.folding.toggleFoldAtLine(100)
         highlighter.requestedLines.clear()
         renderer.resolveDrawHighlightSegmentsForVisibleWindow(state, 90..110)
 
@@ -204,7 +203,7 @@ class TextRendererCacheTest {
             callback?.invoke()
         }
 
-        override fun highlight(text: String, visibleRange: IntRange): List<HighlightSpan> = emptyList()
+        override fun openDocumentBlocking(text: String) = Unit
 
         override fun getLineSegments(line: Int): List<HighlightLineSegment> {
             requestedLines += line

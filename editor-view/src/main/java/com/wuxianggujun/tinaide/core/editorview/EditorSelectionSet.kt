@@ -3,9 +3,9 @@ package com.wuxianggujun.tinaide.core.editorview
 /**
  * Immutable selection/cursor collection used by multi-cursor editing.
  *
- * [primaryIndex] identifies the selection that remains compatible with the legacy
- * [EditorState.cursorOffset] and [EditorState.selectionRange] API. The collection is
- * canonicalized by document order and exact duplicate ranges are removed.
+ * [primaryIndex] identifies the primary caret used by IME, navigation and the viewport.
+ * [EditorState.cursorOffset] and [EditorState.selectionRange] describe that primary selection.
+ * The collection is canonicalized by document order and exact duplicate ranges are removed.
  */
 @ConsistentCopyVisibility
 data class EditorSelectionSet private constructor(

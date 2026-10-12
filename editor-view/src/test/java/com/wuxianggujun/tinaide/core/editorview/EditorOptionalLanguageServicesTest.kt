@@ -52,7 +52,7 @@ class EditorOptionalLanguageServicesTest {
         try {
             val codeEditor = EditorState(codeBuffer)
             val plainEditor = EditorState(plainBuffer)
-            val highlighter = mockk<SyntaxHighlighter>()
+            val highlighter = mockk<SyntaxHighlighter>(relaxUnitFun = true)
 
             codeEditor.highlighter = highlighter
 

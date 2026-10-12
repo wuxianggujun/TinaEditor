@@ -67,8 +67,8 @@ class WhitespaceRendererTest {
         val buffer = CountingTextBuffer(RopeTextBuffer((0 until 5_000).joinToString("\n") { " a " }))
         val state = createState(buffer, WhitespaceRenderMode.ALL, 100f)
         state.updateMetrics(20f, 1f, 120f, 100f, 0f)
-        state.setFoldRegions(listOf(FoldRegion(100, 4_900)), buffer.version)
-        state.toggleFoldAtLine(100)
+        state.folding.setFoldRegions(listOf(FoldRegion(100, 4_900)), buffer.version)
+        state.folding.toggleFoldAtLine(100)
         state.scrollToLine(95)
         val requested = mutableListOf<Int>()
         val frame = createFrame(state) { requested.add(it); buffer.getLine(it) }
