@@ -95,8 +95,10 @@ internal class EditorInteractionController(
                 if (!view.isFocused) {
                     view.requestFocus()
                 }
+                logIme("showSoftInput(SHOW_IMPLICIT) requested")
                 inputMethodManager?.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
             } else {
+                logIme("keyboardController.show() requested (no input host view)")
                 focusRequester.requestFocus()
                 keyboardController?.show()
             }
@@ -114,6 +116,7 @@ internal class EditorInteractionController(
                 if (!view.isFocused) {
                     view.requestFocus()
                 }
+                logIme("requestFocus without keyboard")
             } else {
                 focusRequester.requestFocus()
             }
