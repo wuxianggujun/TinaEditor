@@ -5,6 +5,7 @@ import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -530,7 +531,10 @@ class RopeTextBuffer(
                     ensureOpen()
                     var total = 0
                     FileOutputStream(temporary.toFile()).use { output ->
-                        OutputStreamWriter(output, charset).use { writer ->
+                        val encoder = charset.newEncoder()
+                            .onMalformedInput(CodingErrorAction.REPORT)
+                            .onUnmappableCharacter(CodingErrorAction.REPORT)
+                        OutputStreamWriter(output, encoder).use { writer ->
                             rope.forEachChunk { chunk ->
                                 coroutineContext.ensureActive()
                                 writer.append(chunk)
@@ -835,7 +839,10 @@ class RopeTextBuffer(
             val builder = stagingRope.beginStreamingBuild()
             var charCount = 0
             var lineBreakCount = 0
-            InputStreamReader(file.inputStream(), charset).use { reader ->
+            val decoder = charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+            InputStreamReader(file.inputStream(), decoder).use { reader ->
                 val buffer = CharArray(IO_CHAR_BUFFER_SIZE)
                 while (true) {
                     val count = reader.read(buffer)

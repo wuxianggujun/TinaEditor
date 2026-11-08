@@ -11,6 +11,41 @@ import org.junit.Test
 class RopeTextBufferTest {
 
     @Test
+    fun unrepresentableTextShouldNotReplaceExistingFile() = runTest {
+        val directory = createTempDirectory("strict-buffer-write").toFile()
+        val file = File(directory, "existing.txt").apply { writeText("original") }
+        val buffer = RopeTextBuffer("text \uD83D\uDE42")
+        try {
+            val result = buffer.saveToFile(file, java.nio.charset.Charset.forName("GBK"))
+            assertThat(result.exceptionOrNull()).isInstanceOf(java.nio.charset.CharacterCodingException::class.java)
+            assertThat(file.readText()).isEqualTo("original")
+        } finally {
+            buffer.close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun malformedFileShouldLeaveExistingBufferAndUndoHistoryUntouched() = runTest {
+        val directory = createTempDirectory("strict-buffer-read").toFile()
+        val file = File(directory, "invalid.txt")
+        val buffer = RopeTextBuffer("original")
+        try {
+            buffer.insert(buffer.length, " edited")
+            val version = buffer.version
+            file.writeBytes("valid prefix\n".toByteArray() + byteArrayOf(0xff.toByte()))
+            val result = buffer.loadFromFile(file, Charsets.UTF_8)
+            assertThat(result.exceptionOrNull()).isInstanceOf(java.nio.charset.CharacterCodingException::class.java)
+            assertThat(buffer.toString()).isEqualTo("original edited")
+            assertThat(buffer.version).isEqualTo(version)
+            assertThat(buffer.canUndo()).isTrue()
+        } finally {
+            buffer.close()
+            directory.deleteRecursively()
+        }
+    }
+
+    @Test
     fun lineApiShouldWork() {
         val buffer = RopeTextBuffer()
         buffer.insert(0, "hello\nworld")
