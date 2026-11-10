@@ -38,25 +38,57 @@ class EditorFindController internal constructor(private val editor: EditorState)
     private var resultQuery = ""
     private var resultOptions = EditorFindOptions()
     private var navigateOnRefresh = false
+    private var sessionId = 0L
+    private var selectionBeforeFind: EditorSelectionSet? = null
+    private var selectionVersion = -1L
+    private var previewSelection: EditorSelectionSet? = null
 
     val isCurrent: Boolean
         get() {
             // Observe the Compose version without requiring a host listener for synchronous use.
             @Suppress("UNUSED_EXPRESSION")
             editor.textVersion
-            return resultVersion == editor.textBuffer.version && resultQuery == query && resultOptions == options
+            return !editor.textBuffer.isClosed && resultVersion == editor.textBuffer.version &&
+                resultQuery == query && resultOptions == options
         }
     val matches: List<OffsetRange> get() = if (isCurrent) result.matches else emptyList()
     val matchCount: Int get() = matches.size
 
     fun show(replace: Boolean = false) {
+        if (editor.textBuffer.isClosed) return
+        if (!visible) {
+            sessionId++
+            selectionBeforeFind = editor.selectionSet.takeIf {
+                it.isMultiCursor || it.primary.anchor != it.primary.caret
+            }
+            selectionVersion = editor.textBuffer.version
+            previewSelection = null
+            editor.selectedText()?.takeIf { '\n' !in it && '\r' !in it }?.let(::updateQuery)
+            // Opening the panel only highlights matches. It must not replace the selection
+            // with a shorter regex match, normalize its direction, or drop extra cursors.
+            navigateOnRefresh = false
+            activeIndex = if (isCurrent) matchIndexAtOrAfter(editor.selectionSet.primary.start) else -1
+        }
         visible = true
         showReplacement = replace
-        editor.selectedText()?.takeIf { '\n' !in it && '\r' !in it }?.let(::updateQuery)
         focusRequest++
     }
 
-    fun dismiss() { visible = false }
+    fun dismiss() {
+        if (!visible) return
+        visible = false
+        sessionId++
+        navigateOnRefresh = false
+        val original = selectionBeforeFind
+        // Never restore stale offsets after an edit, or override a selection the user
+        // made directly in the document while the find panel was open.
+        if (original != null && !editor.textBuffer.isClosed && selectionVersion == editor.textBuffer.version &&
+            editor.selectionSet == previewSelection) {
+            editor.applySelectionSet(original, ensureVisible = true)
+        }
+        selectionBeforeFind = null
+        previewSelection = null
+    }
     fun toggleReplacement() { showReplacement = !showReplacement }
 
     fun updateQuery(value: String) {
@@ -82,7 +114,8 @@ class EditorFindController internal constructor(private val editor: EditorState)
     }
 
     internal suspend fun refreshAsync() {
-        if (isCurrent) return
+        if (!visible || editor.textBuffer.isClosed || isCurrent) return
+        val requestedSession = sessionId
         val version = editor.textBuffer.version
         val requestedQuery = query
         val requestedOptions = options
@@ -91,26 +124,26 @@ class EditorFindController internal constructor(private val editor: EditorState)
             val context = currentCoroutineContext()
             EditorFindEngine.scan(text, requestedQuery, requestedOptions, checkCancelled = { context.ensureActive() })
         }
-        if (version == editor.textBuffer.version && query == requestedQuery && options == requestedOptions) {
+        if (visible && sessionId == requestedSession && !editor.textBuffer.isClosed &&
+            version == editor.textBuffer.version && query == requestedQuery && options == requestedOptions) {
             publish(found, version)
         }
     }
 
     fun refresh() {
-        if (isCurrent) return
+        if (editor.textBuffer.isClosed || isCurrent) return
         publish(EditorFindEngine.scan(editor.textBuffer.substring(0, editor.textBuffer.length), query, options),
             editor.textBuffer.version)
     }
 
     private fun publish(found: EditorFindResult, version: Long) {
-        val previous = result.matches.getOrNull(activeIndex)?.start ?: editor.cursorOffset
+        val previous = result.matches.getOrNull(activeIndex)?.start ?: editor.selectionSet.primary.start
         result = found
         resultVersion = version
         resultQuery = query
         resultOptions = options
         error = found.error
-        activeIndex = if (found.matches.isEmpty()) -1 else
-            found.matches.indexOfFirst { it.start >= previous }.takeIf { it >= 0 } ?: 0
+        activeIndex = matchIndexAtOrAfter(previous)
         if (navigateOnRefresh) {
             navigateOnRefresh = false
             revealActive()
@@ -120,16 +153,27 @@ class EditorFindController internal constructor(private val editor: EditorState)
     fun next(): Boolean = navigate(1)
     fun previous(): Boolean = navigate(-1)
 
+    private fun matchIndexAtOrAfter(offset: Int): Int {
+        if (result.matches.isEmpty()) return -1
+        return result.matches.indexOfFirst { it.start >= offset }.takeIf { it >= 0 } ?: 0
+    }
+
     private fun navigate(delta: Int): Boolean {
+        val active = matches.getOrNull(activeIndex)
+        val selection = editor.selectionSet.primary
+        val activeSelected = active != null && selection.start == active.start && selection.end == active.end
         refresh()
         if (matchCount == 0) return false
-        activeIndex = Math.floorMod(activeIndex + delta, matchCount)
+        // Opening the panel leaves the original selection untouched. The first forward
+        // action should reveal the indicated match, not silently skip over it.
+        if (activeSelected || delta < 0) activeIndex = Math.floorMod(activeIndex + delta, matchCount)
         return revealActive()
     }
 
     private fun revealActive(): Boolean {
         val range = matches.getOrNull(activeIndex) ?: return false
         editor.applySelectionSet(EditorSelectionSet.of(range), ensureVisible = true)
+        if (visible) previewSelection = editor.selectionSet
         return true
     }
 
@@ -151,6 +195,7 @@ class EditorFindController internal constructor(private val editor: EditorState)
     fun replaceAll(): Int = replace(null)
 
     private fun replace(target: OffsetRange?): Int {
+        if (editor.textBuffer.isClosed) return 0
         val found = EditorFindEngine.scan(
             editor.textBuffer.substring(0, editor.textBuffer.length), query, options, replacement, target
         )

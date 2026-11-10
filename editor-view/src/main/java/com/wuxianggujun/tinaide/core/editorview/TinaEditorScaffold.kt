@@ -10,7 +10,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -98,6 +103,16 @@ internal fun TinaEditorScaffold(
     )
 
     EditorFindEffect(state)
+    var findWasVisible by remember(state) { mutableStateOf(state.find.visible) }
+    LaunchedEffect(state, state.find.visible) {
+        val closedFind = findWasVisible && !state.find.visible
+        findWasVisible = state.find.visible
+        if (closedFind && !state.textBuffer.isClosed) {
+            // Wait until composition removes the find field before returning IME ownership.
+            interactionController.syncSelectionToIme()
+            interactionController.requestEditorFocusAndKeyboard()
+        }
+    }
     Column(modifier.fillMaxSize()) {
         if (state.multiCursorTapMode) {
             TextButton(onClick = { state.multiCursorTapMode = false }) {
@@ -105,15 +120,8 @@ internal fun TinaEditorScaffold(
             }
         }
         EditorFindBar(state,
-            beforeEdit = {
-                interactionController.prepareForExternalEdit()
-                interactionController.inputHostView?.clearFocus()
-            },
-            afterAction = { interactionController.syncSelectionToIme() },
-            onDismiss = {
-                state.find.dismiss()
-                interactionController.requestEditorFocusAndKeyboard()
-            })
+            beforeEdit = { interactionController.suspendInputForPanel() },
+            afterAction = { interactionController.syncSelectionToIme() })
     Box(
         modifier = Modifier.weight(1f)
             .fillMaxSize()

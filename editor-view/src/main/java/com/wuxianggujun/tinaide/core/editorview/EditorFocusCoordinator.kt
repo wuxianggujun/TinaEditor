@@ -9,6 +9,9 @@ internal class EditorFocusCoordinator(
         composeFocused: Boolean,
         hostFocused: Boolean
     ) {
+        // AndroidView can dispatch a final focus loss while a closing tab detaches.
+        // Its document may already have been released by the host.
+        if (state.textBuffer.isClosed) return
         val effectiveFocused = composeFocused || hostFocused
         val wasFocused = state.isFocused
         state.updateFocus(effectiveFocused)

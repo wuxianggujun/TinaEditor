@@ -12,11 +12,8 @@ import com.wuxianggujun.tinaide.core.textengine.TextChange
  * 因此通过 [Host] 接口注入，组合而非继承（D 依赖倒置）。
  *
  * 源码行宽行为与原内联实现一致，并在结果上叠加 Inlay Hint 的保守预留宽度。
- * 原有逻辑仍**包括以下两个刻意保留的现状**：
- * - 大文件增量扫描（[ensureMaxLineWidthPx] 的分批 while 循环）按 `getLine().length`（UTF-16 字符数）累计，
- *   而全量/采样/可见行口径走 [Host.lineVisualColumns]（视觉列数，Tab 展开）。两者口径不同是原代码现状，
- *   这里**不抹平**，仅做结构搬运。
- * - 各处的 `cachedMaxLineCharsVersion` 失效/置位时机与原实现逐行对应。
+ * 全量、采样、增量扫描及编辑更新统一使用视觉列数（含 Tab 展开），
+ * 避免大文件中不可见的长行被低估，或删除最长行后无法识别旧的最大值。
  */
 internal class EditorMaxLineWidthTracker(
     private val host: Host
@@ -75,13 +72,13 @@ internal class EditorMaxLineWidthTracker(
     /**
      * 横向最大滚动偏移（像素）。等价于原 [EditorState] 内联的 maxScrollXPx()。
      */
-    fun maxScrollXPx(): Float {
+    fun maxScrollXPx(viewportWidthPx: Float = host.viewportWidthPx): Float {
         // 横向右侧预留“可滚动空白”，避免长行滚动到末尾时文本直接贴住屏幕右边缘，
         // 影响光标/选区/句柄的可操作性。
         //
         // 对齐 Sora 的思路：CodeEditor#getScrollMaxX() 里会减去 viewWidth/2，
         // 等价于给右侧增加 half-viewport 的额外滚动空间。
-        val endPadding = host.viewportWidthPx * 0.5f
+        val endPadding = viewportWidthPx * 0.5f
 
         if (host.wordWrapEnabled) {
             // wordWrap 通常禁用横向滚动，但双指缩放过程中需要允许短暂的 X 锚定，
@@ -95,7 +92,7 @@ internal class EditorMaxLineWidthTracker(
         }
 
         val maxLineWidth = ensureMaxLineWidthPx()
-        return (maxLineWidth - host.viewportWidthPx + endPadding).coerceAtLeast(0f)
+        return (maxLineWidth - viewportWidthPx + endPadding).coerceAtLeast(0f)
     }
 
     private fun ensureMaxLineWidthPx(): Float {
@@ -131,7 +128,7 @@ internal class EditorMaxLineWidthTracker(
                     widthScanNextLine < lineCount &&
                     scannedCount < HORIZONTAL_WIDTH_SCAN_MAX_BATCH_LINES
                 ) {
-                    val lineLength = textBuffer.getLine(widthScanNextLine).length
+                    val lineLength = host.lineVisualColumns(textBuffer.getLine(widthScanNextLine))
                     widthScanLineLengths[widthScanNextLine] = lineLength
                     if (lineLength > widthScanMaxChars) {
                         widthScanMaxChars = lineLength

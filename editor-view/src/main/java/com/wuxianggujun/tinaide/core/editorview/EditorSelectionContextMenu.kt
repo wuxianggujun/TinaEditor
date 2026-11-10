@@ -2,9 +2,10 @@ package com.wuxianggujun.tinaide.core.editorview
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -61,10 +62,11 @@ internal const val SELECTION_CONTEXT_MENU_SWITCH_HEADER_SOURCE_ACTION_TAG =
     "editor_selection_context_menu_action_switch_header_source"
 internal const val SELECTION_CONTEXT_MENU_HOVER_ACTION_TAG = "editor_selection_context_menu_action_hover"
 
-private val selectionToolbarWidth = 200.dp
+private val selectionToolbarWidth = 248.dp
 private val selectionToolbarHeight = 56.dp
 private val selectionToolbarButtonSize = 48.dp
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun EditorSelectionContextMenu(
     visible: Boolean,
@@ -113,7 +115,6 @@ internal fun EditorSelectionContextMenu(
 
     LaunchedEffect(keyboardSelectedAction) {
         when (keyboardSelectedAction) {
-            EditorContextMenuActionId.SelectAll,
             EditorContextMenuActionId.PeekDefinition,
             EditorContextMenuActionId.GotoDefinition,
             EditorContextMenuActionId.FindReferences,
@@ -126,6 +127,7 @@ internal fun EditorSelectionContextMenu(
 
             EditorContextMenuActionId.Copy,
             EditorContextMenuActionId.Cut,
+            EditorContextMenuActionId.SelectAll,
             EditorContextMenuActionId.Paste -> moreMenuExpanded = false
 
             null -> Unit
@@ -143,15 +145,23 @@ internal fun EditorSelectionContextMenu(
             modifier = Modifier
                 .testTag(SELECTION_CONTEXT_MENU_TAG)
                 .width(selectionToolbarWidth)
-                .height(selectionToolbarHeight)
+                .heightIn(min = selectionToolbarHeight)
         ) {
-            Row(
+            FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight()
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
+                EditorContextMenuIconAction(
+                    title = stringResource(R.string.editor_context_menu_select_all),
+                    icon = Icons.Default.SelectAll,
+                    tag = SELECTION_CONTEXT_MENU_SELECT_ALL_ACTION_TAG,
+                    keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.SelectAll,
+                    popupColors = popupColors,
+                    modifier = Modifier.width(selectionToolbarButtonSize),
+                    onClick = onSelectAll
+                )
                 EditorContextMenuIconAction(
                     title = stringResource(R.string.editor_context_menu_copy),
                     icon = Icons.Default.ContentCopy,
@@ -159,7 +169,7 @@ internal fun EditorSelectionContextMenu(
                     keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.Copy,
                     enabled = selectedText != null,
                     popupColors = popupColors,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.width(selectionToolbarButtonSize),
                     onClick = onCopy
                 )
                 EditorContextMenuIconAction(
@@ -169,7 +179,7 @@ internal fun EditorSelectionContextMenu(
                     keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.Cut,
                     enabled = selectedText != null,
                     popupColors = popupColors,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.width(selectionToolbarButtonSize),
                     onClick = onCut
                 )
                 EditorContextMenuIconAction(
@@ -178,7 +188,7 @@ internal fun EditorSelectionContextMenu(
                     tag = SELECTION_CONTEXT_MENU_PASTE_ACTION_TAG,
                     keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.Paste,
                     popupColors = popupColors,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.width(selectionToolbarButtonSize),
                     onClick = onPaste
                 )
                 EditorContextMenuMoreAction(
@@ -195,9 +205,8 @@ internal fun EditorSelectionContextMenu(
                     codeActionsEnabled = codeActionsEnabled,
                     renameSymbolEnabled = renameSymbolEnabled,
                     switchHeaderSourceEnabled = switchHeaderSourceEnabled,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.width(selectionToolbarButtonSize),
                     onExpandedChange = { moreMenuExpanded = it },
-                    onSelectAll = onSelectAll,
                     onPeekDefinition = onPeekDefinition,
                     onGotoDefinition = onGotoDefinition,
                     onFindReferences = onFindReferences,
@@ -227,7 +236,7 @@ private fun EditorContextMenuIconAction(
     onClick: () -> Unit
 ) {
     Box(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier.height(selectionToolbarButtonSize),
         contentAlignment = Alignment.Center
     ) {
         IconButton(
@@ -275,7 +284,6 @@ private fun EditorContextMenuMoreAction(
     switchHeaderSourceEnabled: Boolean,
     modifier: Modifier = Modifier,
     onExpandedChange: (Boolean) -> Unit,
-    onSelectAll: () -> Unit,
     onPeekDefinition: () -> Unit,
     onGotoDefinition: () -> Unit,
     onFindReferences: () -> Unit,
@@ -294,7 +302,7 @@ private fun EditorContextMenuMoreAction(
         action()
     }
     Box(
-        modifier = modifier.fillMaxHeight(),
+        modifier = modifier.height(selectionToolbarButtonSize),
         contentAlignment = Alignment.Center
     ) {
         IconButton(
@@ -337,15 +345,6 @@ private fun EditorContextMenuMoreAction(
                     onClick = { runOverflowAction { onEditorAction(action) } }
                 )
             }
-            EditorContextMenuOverflowAction(
-                title = stringResource(R.string.editor_context_menu_select_all),
-                icon = Icons.Default.SelectAll,
-                tag = SELECTION_CONTEXT_MENU_SELECT_ALL_ACTION_TAG,
-                keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.SelectAll,
-                popupColors = popupColors,
-                onClick = { runOverflowAction(onSelectAll) }
-            )
-
             if (hasCodeActions) {
                 EditorPopupDivider(colors = popupColors)
             }

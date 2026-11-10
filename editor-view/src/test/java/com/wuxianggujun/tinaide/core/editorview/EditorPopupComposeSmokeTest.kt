@@ -448,6 +448,7 @@ class EditorPopupComposeSmokeTest {
             .fetchSemanticsNode()
             .boundsInRoot
 
+        composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_SELECT_ALL_ACTION_TAG).performClick()
         composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_COPY_ACTION_TAG).performClick()
         composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_MORE_ACTION_TAG).performClick()
         val toolbarBoundsAfterMore = composeRule
@@ -457,7 +458,7 @@ class EditorPopupComposeSmokeTest {
         composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_HOVER_ACTION_TAG).performClick()
 
         assertThat(toolbarBoundsAfterMore).isEqualTo(toolbarBoundsBeforeMore)
-        assertThat(events).containsExactly("copy", "hover").inOrder()
+        assertThat(events).containsExactly("selectAll", "copy", "hover").inOrder()
     }
 
     @Test
@@ -481,6 +482,19 @@ class EditorPopupComposeSmokeTest {
         composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_GOTO_DEFINITION_ACTION_TAG).performClick()
 
         assertThat(events).containsExactly("gotoDefinition")
+    }
+
+    @Test
+    fun editorSelectionContextMenu_shouldKeepSelectAllInPrimaryRowForKeyboardNavigation() {
+        composeRule.setContent {
+            TestSelectionContextMenu(keyboardSelectedAction = EditorContextMenuActionId.SelectAll)
+        }
+        composeRule.waitForIdle()
+        assertThat(composeRule.onAllNodesWithTag(SELECTION_CONTEXT_MENU_MORE_MENU_TAG).fetchSemanticsNodes()).isEmpty()
+        val selectAll = composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_SELECT_ALL_ACTION_TAG).fetchSemanticsNode().boundsInRoot
+        val copy = composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_COPY_ACTION_TAG).fetchSemanticsNode().boundsInRoot
+        assertThat(selectAll.top).isEqualTo(copy.top)
+        assertThat(selectAll.right).isAtMost(copy.left)
     }
 
     @Test

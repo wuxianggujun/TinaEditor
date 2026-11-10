@@ -75,7 +75,8 @@ internal class WordOccurrenceHighlightRenderer {
     ) {
         val state = frameContext.state
         val textBuffer = state.textBuffer
-        if (textBuffer.lineCount <= 0) return
+        val lineCount = textBuffer.lineCount
+        if (lineCount <= 0) return
         if (state.selectionRange != null) return
 
         val cursorWordInfo = extractWordAtCursor(frameContext) ?: return
@@ -83,13 +84,16 @@ internal class WordOccurrenceHighlightRenderer {
         if (word.length < 2) return
 
         val textVersion = frameContext.textVersion
+        // Resolve the folding/wrapping map once per draw. Rechecking its snapshot
+        // keys for every occurrence is costly even when no wrapping is enabled.
+        val lineMap = state.currentVisualLineMap()
         var cachedLine = -1
         var cachedText = ""
         var cachedMatches: IntArray? = null
         var cachedLayout: EditorLineLayoutCache.PrefixLayout? = null
         for (visualLine in frameContext.visibleLines) {
-            val line = state.docLineForVisualLine(visualLine)
-            if (line >= textBuffer.lineCount) continue
+            val line = state.docLineForVisualLine(visualLine, lineMap)
+            if (line >= lineCount) continue
             if (line != cachedLine) {
                 cachedLine = line
                 cachedText = if (line == cursorWordInfo.line) cursorWordInfo.lineText else frameContext.lineText(line)
@@ -98,8 +102,12 @@ internal class WordOccurrenceHighlightRenderer {
             }
             val matches = cachedMatches ?: continue
             if (matches.isEmpty()) continue
-            val visualStart = state.visualLineStartColumn(visualLine).coerceIn(0, cachedText.length)
-            val visualEnd = state.visualLineEndColumn(visualLine).coerceIn(visualStart, cachedText.length)
+            val visualStart = if (lineMap.wordWrapEnabled) {
+                state.visualLineStartColumn(visualLine).coerceIn(0, cachedText.length)
+            } else 0
+            val visualEnd = if (lineMap.wordWrapEnabled) {
+                state.visualLineEndColumn(visualLine).coerceIn(visualStart, cachedText.length)
+            } else cachedText.length
             val firstPossibleStart = (visualStart - word.length + 1).coerceAtLeast(0)
             val match = matches.binarySearch(firstPossibleStart)
             var matchIndex = if (match >= 0) match else -match - 1

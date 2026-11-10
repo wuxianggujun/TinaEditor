@@ -155,6 +155,15 @@ internal class EditorInteractionController(
         logIme("finishComposingText before external edit")
     }
 
+    fun suspendInputForPanel() {
+        prepareForExternalEdit()
+        // IMEs can deliver queued selection/composition callbacks after focus changes.
+        // Retire the document connection before the Compose field takes ownership.
+        activeInputConnection?.closeConnection()
+        activeInputConnection = null
+        inputHostView?.clearFocus()
+    }
+
     fun syncSelectionToIme() {
         val connection = activeInputConnection
         val (selectionStart, selectionEnd) = if (connection != null) {

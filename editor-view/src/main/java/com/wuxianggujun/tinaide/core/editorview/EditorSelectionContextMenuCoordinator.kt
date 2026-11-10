@@ -43,12 +43,12 @@ internal class EditorSelectionContextMenuCoordinator(
     fun selectedText(): String? = state.selectedText()
 
     fun availableKeyboardActions(): List<EditorContextMenuActionId> = mutableListOf<EditorContextMenuActionId>().apply {
+        add(EditorContextMenuActionId.SelectAll)
         if (selectedText() != null) {
             add(EditorContextMenuActionId.Copy)
             add(EditorContextMenuActionId.Cut)
         }
         add(EditorContextMenuActionId.Paste)
-        add(EditorContextMenuActionId.SelectAll)
         if (state.onRequestPeekDefinition != null) add(EditorContextMenuActionId.PeekDefinition)
         if (state.onRequestGotoDefinition != null) add(EditorContextMenuActionId.GotoDefinition)
         if (state.onRequestFindReferences != null) add(EditorContextMenuActionId.FindReferences)

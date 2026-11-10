@@ -91,7 +91,7 @@ internal fun handleEditorShortcut(
         return true
     }
 
-    if (event.isCtrlPressed && (event.key == Key.F || event.key == Key.H)) {
+    if (ctrlShortcutPressed && (event.key == Key.F || event.key == Key.H)) {
         onBeforeTextEdit()
         state.find.show(replace = event.key == Key.H)
         return true
@@ -103,6 +103,7 @@ internal fun handleEditorShortcut(
     }
     if (event.key == Key.Escape && state.find.visible) {
         state.find.dismiss()
+        onAfterTextEdit()
         return true
     }
     if (event.key == Key.Escape && (state.hasMultipleSelections || state.multiCursorTapMode)) {
@@ -579,7 +580,7 @@ private fun findExactOccurrenceInRange(
 
 private fun TextOccurrence.sameRangeAs(range: OffsetRange): Boolean = startOffset == range.start && endOffset == range.end
 
-private fun KeyEvent.isEditorEnterKey(): Boolean = key == Key.Enter || nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER
+internal fun KeyEvent.isEditorEnterKey(): Boolean = key == Key.Enter || nativeKeyEvent.keyCode == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER
 
 private fun KeyEvent.requestsKeyboardContextMenu(): Boolean {
     if (isCtrlPressed || isAltPressed || isMetaPressed) return false

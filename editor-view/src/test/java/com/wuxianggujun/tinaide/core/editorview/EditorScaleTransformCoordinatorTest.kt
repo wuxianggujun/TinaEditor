@@ -91,6 +91,60 @@ class EditorScaleTransformCoordinatorTest {
     }
 
     @Test
+    fun leftAlignedPinches_keepLineNumbersAndFoldColumnOnScreenAcrossDifferentPivots() {
+        for (pinned in listOf(false, true)) {
+            for (wrapped in listOf(false, true)) {
+                val fixture = fixture(pinLineNumbers = pinned, wordWrap = wrapped, codeFolding = true)
+                fixture.state.scrollOffsetXPx = 0f
+                val initialInset = fixture.state.contentStartXPx
+                for ((zoom, focus) in listOf(
+                    2f to Offset(380f, 280f), 0.5f to Offset(30f, 120f),
+                    0.5f to Offset(180f, 480f), 2f to Offset(350f, 320f)
+                )) {
+                    fixture.ui.transformGestureFocus = focus
+                    fixture.scale(zoom)
+                    assertThat(fixture.preview().scrollOffsetXPx).isEqualTo(0f)
+                    fixture.release()
+                    assertThat(fixture.state.scrollOffsetXPx).isEqualTo(0f)
+                    assertThat(fixture.ui.contentStartXPx).isEqualTo(fixture.state.contentStartXPx)
+                    assertThat(fixture.state.pinLineNumber).isEqualTo(pinned)
+                    fixture.assertNextDrawIsStable()
+                }
+                assertThat(fixture.state.fontSizeSp).isEqualTo(16f)
+                assertThat(fixture.state.contentStartXPx).isWithin(0.001f).of(initialInset)
+            }
+        }
+    }
+
+    @Test
+    fun zoomOutReachingLeftEdge_doesNotReintroduceAnOffsetFromFixedGutterPadding() {
+        for (pinned in listOf(false, true)) {
+            val fixture = fixture(pinLineNumbers = pinned, codeFolding = true)
+            fixture.state.scrollOffsetXPx = 10f
+            fixture.scale(0.5f)
+            assertThat(fixture.preview().scrollOffsetXPx).isEqualTo(0f)
+            fixture.release()
+            assertThat(fixture.state.scrollOffsetXPx).isEqualTo(0f)
+            fixture.assertNextDrawIsStable()
+        }
+    }
+
+    @Test
+    fun scrolledRoundTrip_preservesHorizontalPositionInsteadOfForcingTheOrigin() {
+        for (pinned in listOf(false, true)) {
+            val fixture = fixture(pinLineNumbers = pinned, codeFolding = true)
+            val original = fixture.state.scrollOffsetXPx
+            fixture.scale(1.5f)
+            fixture.release()
+            assertThat(fixture.state.scrollOffsetXPx).isGreaterThan(original)
+            fixture.scale(1f / 1.5f)
+            fixture.release()
+            assertThat(fixture.state.scrollOffsetXPx).isWithin(0.001f).of(original)
+            fixture.assertNextDrawIsStable()
+        }
+    }
+
+    @Test
     fun duplicateFinish_doesNotPublishOrCommitAgain() {
         val fixture = fixture()
         fixture.coordinator.onScaleGesture(1.125f, Offset.Zero, 0f)
@@ -207,6 +261,7 @@ class EditorScaleTransformCoordinatorTest {
         wordWrap: Boolean = false,
         viewportHeight: Float = 600f,
         pinLineNumbers: Boolean = false,
+        codeFolding: Boolean = false,
         onCommit: (Float) -> Unit = {}
     ): Fixture {
         val buffer = RopeTextBuffer(List(200) { "abcdefghij".repeat(80) }.joinToString("\n"))
@@ -221,7 +276,7 @@ class EditorScaleTransformCoordinatorTest {
         lateinit var state: EditorState
         state = EditorState(
             buffer,
-            config = EditorConfig(fontSizeSp = 16f, wordWrap = wordWrap, codeFolding = false, pinLineNumber = pinLineNumbers),
+            config = EditorConfig(fontSizeSp = 16f, wordWrap = wordWrap, codeFolding = codeFolding, pinLineNumber = pinLineNumbers),
             runtimeOptions = EditorRuntimeOptions(onFontSizeChanged = { size ->
                 commits += Commit(size, state.lineHeightPx, state.charWidthPx, state.scrollOffsetPx,
                     state.scrollOffsetXPx, ui.scaleGestureVisualScale, state.isWordWrapLayoutFrozen(),

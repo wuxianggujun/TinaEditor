@@ -28,7 +28,12 @@ internal data class EditorRenderViewport(
             val scrollViewportHeight = state.viewportHeightPx.coerceAtMost(canvasSize.height) / scale
             val maxScrollY = state.maxVerticalScrollOffsetPx(scrollViewportHeight)
             val scrollY = (state.scrollOffsetPx + pivot.y - pivot.y / scale).coerceIn(0f, maxScrollY)
-            val scrollX = (state.scrollOffsetXPx + pivot.x - pivot.x / scale).coerceAtLeast(0f)
+            val textViewportWidth = (size.width - state.contentStartXPx).coerceAtLeast(1f)
+            // A pinch must not turn an initially left-aligned document into a horizontal
+            // pan that hides its line numbers. Wrapping also keeps the gutter at the origin.
+            val scrollX = if (state.config.wordWrap || state.scrollOffsetXPx <= 0f) 0f else
+                (state.scrollOffsetXPx + pivot.x - pivot.x / scale)
+                    .coerceIn(0f, state.maxHorizontalScrollOffsetPx(textViewportWidth))
             val lineHeight = state.lineHeightPx.coerceAtLeast(1f)
             val maxVisualLine = state.visualLineCount() - 1
             val first = floor(scrollY / lineHeight).toInt().coerceIn(0, maxVisualLine.coerceAtLeast(0))

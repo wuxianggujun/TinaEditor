@@ -12,6 +12,16 @@ import org.junit.Test
 class EditorFocusCoordinatorTest {
 
     @Test
+    fun focusCallbackAfterDocumentClose_doesNotReadReleasedBuffer() = runTest {
+        val state = createState("closed tab")
+        state.updateFocus(true)
+        val coordinator = EditorFocusCoordinator(state, createController(state, this), {})
+        state.textBuffer.close()
+        coordinator.syncFocus(composeFocused = false, hostFocused = false)
+        coordinator.syncFocus(composeFocused = true, hostFocused = false)
+    }
+
+    @Test
     fun onComposeFocusChanged_shouldDismissCompletionAndHideContextMenuWhenAllFocusLost() = runTest {
         val state = createState("pri")
         state.updateFocus(true)

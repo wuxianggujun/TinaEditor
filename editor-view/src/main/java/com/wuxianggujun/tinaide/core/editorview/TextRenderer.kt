@@ -136,14 +136,14 @@ internal class TextRenderer {
         )
         val highlightPrepMs = (System.nanoTime() - highlightPrepStartNs) / 1_000_000L
         val defaultColor = scheme.syntax.defaultText.toArgb()
+        val lineMap = state.currentVisualLineMap()
+        val lineCount = state.textBuffer.lineCount
 
         drawScope.drawIntoCanvas { canvas ->
             ensureBadgeMetrics(textPaint)
             visibleVisualLines.forEach { visualLine ->
-                val line = state.docLineForVisualLine(visualLine)
-                if (line >= state.textBuffer.lineCount) return@forEach
-                val visualStartColumn = state.visualLineStartColumn(visualLine)
-                val visualEndColumn = state.visualLineEndColumn(visualLine).coerceAtLeast(visualStartColumn)
+                val line = state.docLineForVisualLine(visualLine, lineMap)
+                if (line >= lineCount) return@forEach
                 val yTop = frameContext.visualLineTopInViewport(visualLine)
                 val baselineY = yTop + state.lineHeightPx * 0.78f
                 val lookup = getOrCacheLineText(
@@ -155,6 +155,10 @@ internal class TextRenderer {
                 } else {
                     cacheMisses++
                 }
+                val visualStartColumn = if (lineMap.wordWrapEnabled) state.visualLineStartColumn(visualLine) else 0
+                val visualEndColumn = if (lineMap.wordWrapEnabled) {
+                    state.visualLineEndColumn(visualLine).coerceAtLeast(visualStartColumn)
+                } else lookup.text.length
 
                 val xPos = textStartX
 

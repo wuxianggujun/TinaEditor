@@ -50,8 +50,8 @@ class EditorSelectionContextMenuCoordinatorTest {
         val actions = coordinator.availableKeyboardActions()
 
         assertThat(actions).containsExactly(
-            EditorContextMenuActionId.Paste,
             EditorContextMenuActionId.SelectAll,
+            EditorContextMenuActionId.Paste,
             EditorContextMenuActionId.GotoDefinition,
             EditorContextMenuActionId.Hover,
             EditorContextMenuActionId.Find,

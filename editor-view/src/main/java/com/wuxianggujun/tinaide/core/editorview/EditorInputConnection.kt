@@ -274,6 +274,7 @@ internal class EditorInputConnection(
     }
 
     override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         val rawReplacement = text?.toString() ?: return true
         val replacement = EditorClipboardBridge.recoverPossiblyTruncatedImeCommitText(rawReplacement)
         if (replacement.length != rawReplacement.length) {
@@ -292,6 +293,7 @@ internal class EditorInputConnection(
     }
 
     override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         val replacement = text?.toString() ?: ""
         prepareComposingSession()
         replaceCurrentImeEditRange(
@@ -304,6 +306,7 @@ internal class EditorInputConnection(
     }
 
     override fun setComposingRegion(start: Int, end: Int): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         val mapped = snapSelectionToEditorUnitBoundaries(
             textBuffer = state.textBuffer,
             start = start,
@@ -352,6 +355,7 @@ internal class EditorInputConnection(
     }
 
     override fun setSelection(start: Int, end: Int): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         val documentLength = state.textBuffer.length
         val before = imeSelectionOffsets()
         val mapped = snapSelectionToEditorUnitBoundaries(
@@ -484,9 +488,13 @@ internal class EditorInputConnection(
         }
     }
 
-    override fun sendKeyEvent(event: KeyEvent): Boolean = handleKeyEvent(event) || super.sendKeyEvent(event)
+    override fun sendKeyEvent(event: KeyEvent): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
+        return handleKeyEvent(event) || super.sendKeyEvent(event)
+    }
 
     internal fun handleKeyEvent(event: KeyEvent): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         if (event.action != KeyEvent.ACTION_DOWN) return false
         if (shouldDeferModifiedKeyEvent(event)) return false
         return when (event.keyCode) {
@@ -718,6 +726,7 @@ internal class EditorInputConnection(
     }
 
     override fun commitCompletion(text: CompletionInfo?): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         val completionText = text?.text?.toString() ?: return false
         replaceCurrentImeEditRange(
             replacement = completionText,
@@ -735,6 +744,7 @@ internal class EditorInputConnection(
     }
 
     override fun performEditorAction(editorAction: Int): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         // 很多第三方输入法（搜狗、百度、讯飞等）按下回车时不发送 sendKeyEvent(KEYCODE_ENTER)，
         // 而是调用 performEditorAction。若此处返回 false，回车键在这些输入法上将完全无效。
         // IME_ACTION_UNSPECIFIED / IME_NULL 也需要处理，因为部分输入法用它们表示普通换行。
@@ -759,6 +769,7 @@ internal class EditorInputConnection(
     }
 
     override fun performContextMenuAction(id: Int): Boolean {
+        if (closed.get() || state.textBuffer.isClosed) return false
         return when (id) {
             android.R.id.selectAll -> {
                 finishComposingSession()
@@ -863,7 +874,7 @@ internal class EditorInputConnection(
         reason: String,
         surroundingRange: (Int) -> ImeDeleteRange?
     ): Boolean {
-        if (closed.get()) return false
+        if (closed.get() || state.textBuffer.isClosed) return false
         ensureComposingSessionValid()
         if (!state.hasMultipleSelections && state.selectionRange == null && composingRange == null) {
             // Keep ordinary typing/deletion on the allocation-light, snippet-aware path.

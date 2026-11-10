@@ -3,6 +3,7 @@ package com.wuxianggujun.tinaide.core.editorview
 import com.google.common.truth.Truth.assertThat
 import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import com.wuxianggujun.tinaide.core.textengine.TextBuffer
+import com.wuxianggujun.tinaide.core.textengine.TextScanKernel
 import org.junit.Test
 
 /**
@@ -31,7 +32,12 @@ class EditorMaxLineWidthTrackerTest {
         var inlayExpandedLineColumns: Int = 0,
     ) : EditorMaxLineWidthTracker.Host {
 
-        override fun lineVisualColumns(lineText: String): Int = lineText.length
+        var visualColumnMeasurements = 0
+
+        override fun lineVisualColumns(lineText: String): Int {
+            visualColumnMeasurements++
+            return TextScanKernel.measureVisualColumns(lineText, 4)
+        }
 
         override fun currentVisualLineMap(): EditorVisualLineMapper.VisualLineMap {
             val count = textBuffer.lineCount.coerceAtLeast(0)
@@ -168,5 +174,45 @@ class EditorMaxLineWidthTrackerTest {
 
         // longest line now 102 chars: (102 - 20 + 10) = 92
         assertThat(tracker.maxScrollXPx()).isEqualTo(92f)
+    }
+
+    @Test
+    fun largeDocument_unsampledTabsRemainReachableAfterScanAndUnrelatedEdit() {
+        val buffer = RopeTextBuffer((0 until 5_000).joinToString("\n") {
+            if (it == 1_001) "\t".repeat(80) else "x"
+        })
+        val host = FakeTrackerHost(buffer)
+        val tracker = EditorMaxLineWidthTracker(host)
+        // A call scans at least one 32-row batch. Complete every batch, then
+        // verify the bound even though the widest row was never on screen.
+        repeat(170) { tracker.maxScrollXPx() }
+        assertThat(tracker.maxScrollXPx()).isEqualTo(310f)
+        val warmedMeasurements = host.visualColumnMeasurements
+        repeat(10) { tracker.maxScrollXPx() }
+        assertThat(host.visualColumnMeasurements).isEqualTo(warmedMeasurements)
+        buffer.addChangeListener { tracker.applyWidthSnapshotChange(it, buffer.version) }
+        buffer.insert(buffer.length, "y")
+        assertThat(tracker.maxScrollXPx()).isEqualTo(310f)
+        host.charWidthPx = 2f
+        assertThat(tracker.maxScrollXPx()).isEqualTo(630f)
+    }
+
+    @Test
+    fun largeDocument_editingWidestRowRecomputesRemainingTabWidth() {
+        val buffer = RopeTextBuffer((0 until 5_000).joinToString("\n") {
+            when (it) {
+                1_001 -> "\t".repeat(100)
+                2_001 -> "\t".repeat(80)
+                else -> "x"
+            }
+        })
+        val host = FakeTrackerHost(buffer, visibleLines = 1_001..1_001, cursorLine = 0)
+        val tracker = EditorMaxLineWidthTracker(host)
+        repeat(170) { tracker.maxScrollXPx() }
+        assertThat(tracker.maxScrollXPx()).isEqualTo(390f)
+        buffer.addChangeListener { tracker.applyWidthSnapshotChange(it, buffer.version) }
+        val start = buffer.positionToOffset(1_001, 0)
+        buffer.delete(start, start + 100)
+        assertThat(tracker.maxScrollXPx()).isEqualTo(310f)
     }
 }

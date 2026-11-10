@@ -50,6 +50,30 @@ class EditorRenderViewportTest {
     }
 
     @Test
+    fun zoomPreview_respectsBothHorizontalEdgesAndDoesNotPanAWrappedDocument() {
+        val state = state()
+        for (scale in listOf(0.25f, 0.5f, 2f, 3f)) {
+            state.scrollOffsetXPx = 0f
+            val left = EditorRenderViewport.forScalePreview(state, Size(400f, 600f), scale, Offset(390f, 200f))
+            assertThat(left.scrollOffsetXPx).isEqualTo(0f)
+
+            state.scrollOffsetXPx = state.maxHorizontalScrollOffsetPx()
+            val right = EditorRenderViewport.forScalePreview(state, Size(400f, 600f), scale, Offset(390f, 200f))
+            assertThat(right.scrollOffsetXPx).isAtLeast(0f)
+            assertThat(right.scrollOffsetXPx).isAtMost(
+                state.maxHorizontalScrollOffsetPx((right.size.width - state.contentStartXPx).coerceAtLeast(1f))
+            )
+        }
+        val wrapped = EditorState(RopeTextBuffer("long line ".repeat(100)), config = EditorConfig(wordWrap = true))
+        wrapped.updateMetrics(20f, 10f, 600f, 360f, 40f)
+        wrapped.freezeWordWrapLayoutIfNeeded()
+        val preview = EditorRenderViewport.forScalePreview(wrapped, Size(400f, 600f), 2f, Offset(300f, 200f))
+        assertThat(preview.scrollOffsetXPx).isEqualTo(0f)
+        state.textBuffer.close()
+        wrapped.textBuffer.close()
+    }
+
+    @Test
     fun frameContext_returnsToNormalViewportAfterPreview() {
         val state = state().apply { scrollOffsetPx = 1200f }
         val context = EditorRenderFrameContext(TextRenderer())

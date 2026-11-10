@@ -112,7 +112,10 @@ internal class EditorScaleTransformCoordinator(
                 focus.x / scale, active.contentStartXPx, preview.size.width - active.contentStartXPx
             )
             val targetFocusX = textViewportX(focus.x, targetContentStartX, targetViewportWidth)
-            val scrollX = if (state.config.wordWrap) 0f else
+            // Gutter paddings are fixed pixels, not font units. Reanchoring a preview
+            // clamped at zero through the font ratio would reintroduce a positive offset
+            // (targetContentStart - oldContentStart * scale) and hide part of the gutter.
+            val scrollX = if (state.config.wordWrap || preview.scrollOffsetXPx == 0f) 0f else
                 (preview.scrollOffsetXPx + previewFocusX) * (targetCharWidth / active.charWidthPx) - targetFocusX
 
             fontScaleCoordinator.apply(active.targetFontSizeSp) {

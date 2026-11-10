@@ -572,6 +572,24 @@ class EditorInputConnectionEditTest {
     }
 
     @Test
+    fun closedConnection_cannotShrinkSelectionOrEditAfterFindTakesFocus() {
+        val state = EditorState(RopeTextBuffer("abcdefghij"))
+        state.selectRange(10, 0)
+        val original = state.selectionSet
+        val connection = createConnection(state)
+        connection.closeConnection()
+
+        assertThat(connection.setSelection(0, 7)).isFalse()
+        assertThat(connection.commitText("late", 1)).isFalse()
+        assertThat(connection.setComposingText("late", 1)).isFalse()
+        assertThat(connection.setComposingRegion(0, 7)).isFalse()
+        assertThat(connection.performContextMenuAction(android.R.id.cut)).isFalse()
+        assertThat(state.selectionSet).isEqualTo(original)
+        assertThat(state.textBuffer.toString()).isEqualTo("abcdefghij")
+        state.textBuffer.close()
+    }
+
+    @Test
     fun externalEditAfterFinishingComposition_shouldCreateSeparateUndoEntry() {
         val state = EditorState(RopeTextBuffer())
         val connection = createConnection(state)

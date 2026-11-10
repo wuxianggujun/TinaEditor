@@ -799,8 +799,12 @@ class EditorState(
         }
     }
 
-    internal fun docLineForVisualLine(visualLine: Int): Int {
-        val map = visualLineMapper.visualLineMap()
+    internal fun currentVisualLineMap(): EditorVisualLineMapper.VisualLineMap = visualLineMapper.visualLineMap()
+
+    internal fun docLineForVisualLine(
+        visualLine: Int,
+        map: EditorVisualLineMapper.VisualLineMap = currentVisualLineMap(),
+    ): Int {
         if (map.visualLineCount <= 0) return 0
         val safeVisual = visualLine.coerceIn(0, map.visualLineCount - 1)
         val visibleIndex = visualLineMapper.resolveVisibleIndexForVisualLine(map, safeVisual)
@@ -992,7 +996,8 @@ class EditorState(
 
     internal fun maxVerticalScrollOffsetPx(viewportHeightPx: Float): Float = maxScrollPx(viewportHeightPx)
 
-    fun maxHorizontalScrollOffsetPx(): Float = maxScrollXPx()
+    fun maxHorizontalScrollOffsetPx(viewportWidthPx: Float = this.viewportWidthPx): Float =
+        maxLineWidthTracker.maxScrollXPx(viewportWidthPx)
 
     fun scrollToLine(line: Int) {
         val oldX = scrollOffsetXPx

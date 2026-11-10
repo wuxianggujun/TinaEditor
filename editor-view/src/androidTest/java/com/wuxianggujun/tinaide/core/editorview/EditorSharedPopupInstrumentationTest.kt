@@ -8,6 +8,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.unit.IntOffset
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
@@ -62,7 +64,7 @@ class EditorSharedPopupInstrumentationTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText("sig(Int count, Boolean enabled)").performClick()
+        composeRule.onNodeWithTag(signatureHelpPopupRowTag(1)).performScrollTo().assertIsDisplayed().performClick()
 
         assertEquals(1, clickedSignatureIndex)
     }
@@ -119,7 +121,6 @@ class EditorSharedPopupInstrumentationTest {
         }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_MORE_ACTION_TAG).performClick()
         composeRule.onNodeWithTag(SELECTION_CONTEXT_MENU_SELECT_ALL_ACTION_TAG).performClick()
 
         assertEquals(1, selectAllClicks)

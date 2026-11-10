@@ -227,7 +227,7 @@ class WordOccurrenceHighlightRendererTest {
         val rects = WordOccurrenceHighlightRenderer().resolveHighlightRects(frame, 10f, Paint(), EditorLineLayoutCache())
         assertThat(rects).hasSize(9)
         assertThat(requested).containsExactlyElementsIn((95..100) + (4_901..4_903)).inOrder()
-        assertThat(buffer.lineCountReads).isLessThan(1_000)
+        assertThat(buffer.lineCountReads).isLessThan(100)
     }
 
     private class CountingTextBuffer(
