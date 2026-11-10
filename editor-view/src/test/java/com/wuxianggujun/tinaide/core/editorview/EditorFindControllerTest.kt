@@ -5,6 +5,7 @@ import com.wuxianggujun.tinaide.core.textengine.RopeTextBuffer
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import org.junit.After
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -89,7 +90,10 @@ class EditorFindControllerTest {
         val state = state("foo foo")
         state.find.show()
         state.find.updateQuery("foo")
-        val pending = async(start = CoroutineStart.UNDISPATCHED) { state.find.refreshAsync() }
+        val pending = async(start = CoroutineStart.UNDISPATCHED) {
+            state.find.refreshAsync(StandardTestDispatcher(testScheduler))
+        }
+        assertThat(pending.isCompleted).isFalse()
         state.textBuffer.close()
         pending.await()
         state.find.dismiss()
@@ -127,8 +131,11 @@ class EditorFindControllerTest {
         val original = state.selectionSet
         state.find.show()
         state.find.updateQuery("abc")
-        // The worker result resumes on this test scheduler only after we close/reopen.
-        val pending = async(start = CoroutineStart.UNDISPATCHED) { state.find.refreshAsync() }
+        // Queue the worker explicitly: a real Default worker can finish before withContext suspends.
+        val pending = async(start = CoroutineStart.UNDISPATCHED) {
+            state.find.refreshAsync(StandardTestDispatcher(testScheduler))
+        }
+        assertThat(pending.isCompleted).isFalse()
         state.find.dismiss()
         state.find.show()
         state.find.updateQuery("abc")

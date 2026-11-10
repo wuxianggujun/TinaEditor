@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -113,14 +114,14 @@ class EditorFindController internal constructor(private val editor: EditorState)
         return matchCount
     }
 
-    internal suspend fun refreshAsync() {
+    internal suspend fun refreshAsync(searchDispatcher: CoroutineDispatcher = Dispatchers.Default) {
         if (!visible || editor.textBuffer.isClosed || isCurrent) return
         val requestedSession = sessionId
         val version = editor.textBuffer.version
         val requestedQuery = query
         val requestedOptions = options
         val text = editor.textBuffer.substring(0, editor.textBuffer.length)
-        val found = withContext(Dispatchers.Default) {
+        val found = withContext(searchDispatcher) {
             val context = currentCoroutineContext()
             EditorFindEngine.scan(text, requestedQuery, requestedOptions, checkCancelled = { context.ensureActive() })
         }
