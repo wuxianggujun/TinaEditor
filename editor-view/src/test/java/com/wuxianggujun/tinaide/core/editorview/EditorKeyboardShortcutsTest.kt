@@ -881,6 +881,46 @@ class EditorKeyboardShortcutsTest {
     }
 
     @Test
+    fun handleEditorShortcut_shouldPreserveIndentationSelectionsThroughUndoRedo() {
+        val state = createState("  ab\n    cd\ne")
+        state.config = state.config.copy(indentSize = 2, tabSize = 8)
+        val original = EditorSelectionSet.of(
+            primary = OffsetRange(3, 0),
+            secondary = listOf(OffsetRange(8, 6)),
+        )
+        state.applySelectionSet(original, ensureVisible = false)
+
+        handleShortcut(state, keyDownEvent(AndroidKeyEvent.KEYCODE_TAB))
+
+        assertThat(state.textBuffer.toString()).isEqualTo("    ab\n      cd\ne")
+        val indented = EditorSelectionSet.of(
+            primary = OffsetRange(5, 2),
+            secondary = listOf(OffsetRange(12, 10)),
+        )
+        assertThat(state.selectionSet).isEqualTo(indented)
+        assertThat(state.undo()).isTrue()
+        assertThat(state.textBuffer.toString()).isEqualTo("  ab\n    cd\ne")
+        assertThat(state.selectionSet).isEqualTo(original)
+        assertThat(state.redo()).isTrue()
+        assertThat(state.selectionSet).isEqualTo(indented)
+    }
+
+    @Test
+    fun handleEditorShortcut_shouldClampOutdentedCaretsAtTheirOwnLineStart() {
+        val state = createState("    a\n    b\nc")
+        state.config = state.config.copy(indentSize = 2, tabSize = 8)
+        state.applySelectionSet(
+            EditorSelectionSet.of(OffsetRange(1, 1), listOf(OffsetRange(9, 9))),
+            ensureVisible = false,
+        )
+
+        handleShortcut(state, keyDownEvent(AndroidKeyEvent.KEYCODE_TAB, AndroidKeyEvent.META_SHIFT_ON))
+
+        assertThat(state.textBuffer.toString()).isEqualTo("  a\n  b\nc")
+        assertThat(state.selectionSet.selections).containsExactly(OffsetRange(0, 0), OffsetRange(5, 5)).inOrder()
+    }
+
+    @Test
     fun handleEditorShortcut_shouldOutdentEveryMultiCursorLineWithShiftTab() {
         val state = createState("    a\n\tb\nc")
         state.applySelectionSet(

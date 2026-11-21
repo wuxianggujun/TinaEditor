@@ -71,9 +71,14 @@ internal fun editorIndentOrOutdentMultipleSelectionsByTab(
     }
     if (edits.isEmpty()) return false
 
-    val selectionAfter = mapSelectionSetThroughEdits(
+    val selectionAfter = rebuildSelectionSet(
         selectionSet = state.selectionSet,
-        edits = edits
+        mappedRanges = state.selectionSet.selections.map { selection ->
+            OffsetRange(
+                anchor = mapOffsetThroughIndentationEdits(selection.anchor, edits),
+                caret = mapOffsetThroughIndentationEdits(selection.caret, edits),
+            )
+        },
     )
     return applyMultiCursorLineEditPlan(
         state = state,
@@ -81,6 +86,19 @@ internal fun editorIndentOrOutdentMultipleSelectionsByTab(
         selectionAfter = selectionAfter,
         reason = if (outdent) "outdentLines" else "indentLines"
     )
+}
+
+private fun mapOffsetThroughIndentationEdits(offset: Int, edits: List<EditorTextEdit>): Int {
+    var precedingDelta = 0
+    for (edit in edits) {
+        if (offset < edit.start) break
+        val delta = edit.replacement.length - (edit.end - edit.start)
+        // Match single-selection indentation: move by the changed width, clamping at line start.
+        // Generic replacements instead collapse every caret inside the whitespace to its end.
+        if (offset <= edit.end) return (offset + delta).coerceAtLeast(edit.start) + precedingDelta
+        precedingDelta += delta
+    }
+    return offset + precedingDelta
 }
 
 internal fun editorDuplicateMultipleSelectedLines(state: EditorState): Boolean {
