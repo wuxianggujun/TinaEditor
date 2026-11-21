@@ -50,5 +50,9 @@ data class EditorConfig(
     val showMinimap: Boolean = false,
 
     /** 是否在行号栏左侧用色条标出相对 HEAD 新增/修改/删除的行（git gutter），默认关闭。 */
-    val showGitGutter: Boolean = false
+    val showGitGutter: Boolean = false,
+
+    /** Visual columns per indentation level, independent of tab-stop/display width. */
+    val indentSize: Int = tabSize,
+    val continuationIndentSize: Int = indentSize,
 )

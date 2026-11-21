@@ -930,8 +930,6 @@ internal fun editorIndentOrOutdentSelectionByTab(
         endLine = (endLine - 1).coerceAtLeast(startLine)
     }
 
-    val tabSize = state.config.tabSize.coerceAtLeast(1)
-    val indentUnit = if (state.config.insertSpacesForTabs) " ".repeat(tabSize) else "\t"
     val segmentStartOffset = state.textBuffer.getLineStart(startLine)
     val segmentEndOffset = state.textBuffer.getLineEnd(endLine)
         .coerceAtLeast(segmentStartOffset)
@@ -942,18 +940,9 @@ internal fun editorIndentOrOutdentSelectionByTab(
     val perLineColumnDelta = IntArray(lines.size)
 
     val updatedLines = lines.mapIndexed { index, line ->
-        if (!outdent) {
-            perLineColumnDelta[index] = indentUnit.length
-            indentUnit + line
-        } else {
-            val removeCount = TextScanKernel.scanLineWhitespace(line, tabSize).outdentRemoveCount
-            perLineColumnDelta[index] = -removeCount
-            if (removeCount <= 0) {
-                line
-            } else {
-                line.drop(removeCount)
-            }
-        }
+        val indentation = resolveEditorLineIndentation(line, state.config, outdent)
+        perLineColumnDelta[index] = indentation.columnDelta
+        indentation.text + line.drop(indentation.oldLength)
     }
     val updated = updatedLines.joinToString("\n")
     if (updated == original) return false

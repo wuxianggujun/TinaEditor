@@ -54,37 +54,17 @@ internal fun editorIndentOrOutdentMultipleSelectionsByTab(
     if (!state.hasMultipleSelections) return false
 
     val resolution = resolveMultiCursorLineBlocks(state)
-    val indentUnit = if (state.config.insertSpacesForTabs) {
-        " ".repeat(state.config.tabSize.coerceAtLeast(1))
-    } else {
-        "\t"
-    }
     val edits = ArrayList<EditorTextEdit>()
     resolution.blocks.forEach { block ->
         for (line in block.startLine..block.endLine) {
             val lineStart = state.textBuffer.getLineStart(line)
-            if (!outdent) {
-                edits += EditorTextEdit(
-                    start = lineStart,
-                    end = lineStart,
-                    replacement = indentUnit
-                )
-                continue
-            }
-
             val lineText = state.textBuffer.getLine(line)
-            val removeCount = if (lineText.firstOrNull() == '\t') {
-                1
-            } else {
-                TextScanKernel
-                    .scanLineWhitespace(lineText, state.config.tabSize)
-                    .outdentRemoveCount
-            }
-            if (removeCount > 0) {
+            val indentation = resolveEditorLineIndentation(lineText, state.config, outdent)
+            if (indentation.text != lineText.take(indentation.oldLength)) {
                 edits += EditorTextEdit(
                     start = lineStart,
-                    end = lineStart + removeCount,
-                    replacement = ""
+                    end = lineStart + indentation.oldLength,
+                    replacement = indentation.text,
                 )
             }
         }

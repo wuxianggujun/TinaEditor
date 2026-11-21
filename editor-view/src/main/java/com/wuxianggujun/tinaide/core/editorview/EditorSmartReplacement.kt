@@ -35,7 +35,7 @@ internal object EditorSmartReplacement {
         endOffset: Int = startOffset,
     ): EditorResolvedReplacement {
         val hasSelection = endOffset != startOffset
-        if (replacement == "\t" && state.config.insertSpacesForTabs) {
+        if (replacement == "\t") {
             val startPosition = runCatching { state.textBuffer.offsetToPosition(startOffset) }.getOrNull()
                 ?: return EditorResolvedReplacement(replacement, cursorOffsetAfterInsert = null)
             val line = startPosition.line.coerceIn(0, (state.textBuffer.lineCount - 1).coerceAtLeast(0))
@@ -43,8 +43,20 @@ internal object EditorSmartReplacement {
             val column = startPosition.column.coerceIn(0, lineText.length)
             val tabSize = state.config.tabSize.coerceAtLeast(1)
             val visualColumn = resolveVisualColumnForTabStops(lineText, column, tabSize)
-            val spaces = (tabSize - (visualColumn % tabSize)).coerceIn(1, tabSize)
-            return EditorResolvedReplacement(" ".repeat(spaces), cursorOffsetAfterInsert = null)
+            val leadingWhitespaceEnd = TextScanKernel.scanLineWhitespace(lineText, tabSize).leadingWhitespaceEnd
+            val isIndentation = column <= leadingWhitespaceEnd
+            if (!isIndentation && !state.config.insertSpacesForTabs) {
+                return EditorResolvedReplacement(replacement, cursorOffsetAfterInsert = null)
+            }
+            if (isIndentation && state.config.indentSize <= 0) {
+                return EditorResolvedReplacement("", cursorOffsetAfterInsert = null)
+            }
+            val step = if (isIndentation) state.config.indentSize.coerceAtLeast(1) else tabSize
+            val spaces = (step - (visualColumn % step)).coerceIn(1, step)
+            return EditorResolvedReplacement(
+                buildEditorIndentationFromColumn(visualColumn, spaces, state.config),
+                cursorOffsetAfterInsert = null,
+            )
         }
 
         if (replacement.length == 1) {
@@ -103,30 +115,36 @@ internal object EditorSmartReplacement {
             startIndex = TextScanKernel.scanLineWhitespace(after, state.config.tabSize).leadingWhitespaceEnd
         )
 
-        val tabSize = state.config.tabSize.coerceAtLeast(1)
-        val indentUnit = if (state.config.insertSpacesForTabs) {
-            " ".repeat(tabSize)
-        } else {
-            "\t"
-        }
-
-        val shouldIndentMore = trimmedBefore.endsWith("{") ||
-            trimmedBefore.endsWith("(") ||
-            trimmedBefore.endsWith("[")
+        val opensBlock = trimmedBefore.endsWith("{")
+        val opensContinuation = trimmedBefore.endsWith("(") || trimmedBefore.endsWith("[")
+        val shouldIndentMore = opensBlock || opensContinuation
+        val extraIndentWidth = when {
+            opensBlock -> state.config.indentSize
+            opensContinuation -> state.config.continuationIndentSize
+            else -> 0
+        }.coerceAtLeast(0)
 
         val closingAfter = trimmedAfter.startsWith("}") ||
             trimmedAfter.startsWith(")") ||
             trimmedAfter.startsWith("]")
 
+        val nextIndent = if (shouldIndentMore && extraIndentWidth > 0) {
+            buildEditorIndentation(
+                lineWhitespaceInfo.leadingIndentColumns + extraIndentWidth,
+                state.config,
+            )
+        } else {
+            baseIndent
+        }
+
         if (shouldIndentMore && closingAfter) {
-            val resolvedReplacement = "\n" + baseIndent + indentUnit + "\n" + baseIndent
-            val cursorOffset = (startOffset + 1 + baseIndent.length + indentUnit.length)
+            val resolvedReplacement = "\n" + nextIndent + "\n" + baseIndent
+            val cursorOffset = (startOffset + 1 + nextIndent.length)
                 .coerceIn(0, state.textBuffer.length + resolvedReplacement.length)
             return EditorResolvedReplacement(resolvedReplacement, cursorOffsetAfterInsert = cursorOffset)
         }
 
-        val extraIndent = if (shouldIndentMore) indentUnit else ""
-        val resolvedReplacement = "\n" + baseIndent + extraIndent
+        val resolvedReplacement = "\n" + nextIndent
         // The generated indentation is part of the user-visible newline edit. Some IMEs
         // report newCursorPosition == 0 for Enter, which would otherwise leave the caret
         // before these spaces and make the next character appear before the indentation.
