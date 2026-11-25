@@ -8,6 +8,16 @@ enum class WhitespaceRenderMode {
     ALL
 }
 
+/** Line numbers remain independent of the optional, interactive decoration column. */
+enum class EditorGutterMode {
+    /** Existing folding, breakpoint, bookmark and line-number actions. */
+    DEFAULT,
+    /** No decoration column or gutter actions; line numbers may still be displayed. */
+    HIDDEN,
+    /** Compact, display-only single-character labels supplied by the document owner. */
+    LABELS,
+}
+
 data class EditorConfig(
     val showLineNumbers: Boolean = true,
     /**
@@ -55,4 +65,5 @@ data class EditorConfig(
     /** Visual columns per indentation level, independent of tab-stop/display width. */
     val indentSize: Int = tabSize,
     val continuationIndentSize: Int = indentSize,
+    val gutterMode: EditorGutterMode = EditorGutterMode.DEFAULT,
 )

@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.toArgb
 import com.wuxianggujun.tinaide.core.textengine.TextChange
 import com.wuxianggujun.tinaide.core.treesitter.HighlightLineSegment
@@ -206,8 +207,9 @@ internal class TextRenderer {
                 val bracketInfos = visibleBracketInfos[line].orEmpty()
 
                 val hasBrackets = bracketInfos.isNotEmpty()
-                if (segments.isEmpty() && semanticSegments.isEmpty() && !hasBrackets) {
-                    textPaint.color = defaultColor
+                val lineForeground = state.lineForegroundColors[line]?.takeIf { it.isSpecified }
+                if (lineForeground != null || (segments.isEmpty() && semanticSegments.isEmpty() && !hasBrackets)) {
+                    textPaint.color = lineForeground?.toArgb() ?: defaultColor
                     if (containsTab) {
                         drawTextRangeWithTabStops(
                             canvas = canvas.nativeCanvas,

@@ -2,6 +2,7 @@ package com.wuxianggujun.tinaide.core.editorview
 
 import com.wuxianggujun.tinaide.core.editorapi.SemanticToken
 import android.graphics.Typeface
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -448,6 +449,10 @@ class EditorState(
             return field
         }
     val gutterDecorations = mutableStateMapOf<Int, GutterDecoration>()
+
+    /** Optional whole-line foreground overrides (zero-based logical lines). The document owner
+     * rebases these alongside its annotations. Unspecified/absent entries retain syntax colors. */
+    val lineForegroundColors = mutableStateMapOf<Int, Color>()
 
     /** 宿主计算的“相对 HEAD 的逐行改动”（行号栏 git 色条）。整份重算并原子替换，可为空。 */
     var gitLineChanges by mutableStateOf<Map<Int, EditorGitLineChangeType>>(emptyMap())
@@ -1242,6 +1247,7 @@ class EditorState(
     }
 
     fun dispatchGutterTap(line: Int) {
+        if (config.gutterMode != EditorGutterMode.DEFAULT) return
         // fold 优先：gutter 点击在“可折叠行”上默认触发折叠开关（更符合常见编辑器习惯），
         // bookmark 等次要标记建议通过长按或其它入口操作。
         if (gutterDecorations[line]?.foldable == true) {
@@ -1252,6 +1258,7 @@ class EditorState(
     }
 
     fun dispatchGutterFoldToggle(line: Int) {
+        if (config.gutterMode != EditorGutterMode.DEFAULT) return
         if (gutterDecorations[line]?.foldable == true) {
             onGutterFoldToggle?.invoke(line)
             return
@@ -1260,6 +1267,7 @@ class EditorState(
     }
 
     fun dispatchGutterLongPress(line: Int) {
+        if (config.gutterMode != EditorGutterMode.DEFAULT) return
         onGutterLongPress?.invoke(line)
     }
 

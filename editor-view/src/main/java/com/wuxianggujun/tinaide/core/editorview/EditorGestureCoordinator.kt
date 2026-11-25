@@ -56,6 +56,7 @@ internal class EditorGestureCoordinator(
         when {
             gutterX < zones.lineNumberEndX -> {
                 gestureHandler.clearTextTapTracking()
+                if (state.config.gutterMode != EditorGutterMode.DEFAULT) return
                 if (state.multiCursorTapMode || isAltPressed) {
                     interactionController.prepareForExternalEdit()
                     val column = state.cursorPosition.column.coerceAtMost(state.textBuffer.getLine(line).length)
@@ -178,6 +179,7 @@ internal class EditorGestureCoordinator(
 
         when {
             gutterX < zones.lineNumberEndX -> {
+                if (state.config.gutterMode != EditorGutterMode.DEFAULT) return
                 state.onLineNumberLongPress?.invoke(line)
                 return
             }

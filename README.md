@@ -102,6 +102,29 @@ DisposableEffect(editorState) {
 应用需自行提供 Activity、Compose 主题、文件读写和语法/LSP 服务。
 库的公开包名为 `com.wuxianggujun.tinaide.core.*`，native 绑定由对应模块管理。
 
+## 只读视图与侧栏
+
+`TinaCodeViewer(state, modifier)` 复用同一渲染器与行缓存，但不创建输入宿主、焦点或编辑手势。
+侧栏可按实例设置，不修改其他编辑器或宿主全局偏好：
+
+- `EditorGutterMode.DEFAULT` 保留原有侧栏宽度、折叠与行号／断点／书签操作（默认值）。
+- `EditorGutterMode.HIDDEN` 移除额外侧栏与上述操作，行号仍由 `showLineNumbers` 单独控制。
+- `EditorGutterMode.LABELS` 使用单字符宽度与紧凑留白，只展示 `gutterDecorations[line].label`，不启用断点等操作。
+
+```kotlin
+state.config = state.config.copy(pinLineNumber = true, gutterMode = EditorGutterMode.LABELS)
+state.gutterDecorations[0] = GutterDecoration(label = GutterLineLabel('W', state.colorScheme.diagnosticWarning))
+TinaCodeViewer(state, Modifier.fillMaxSize())
+```
+
+行索引为零基逻辑行；标签只出现在该行的首个视觉段，不在自动换行续段重复。
+标签不写进文本缓冲。不可选视图的无障碍文本保留标签信息；可选视图使用正文坐标，保证无障碍选区与复制范围一致。文档所有者负责在插入、裁剪和清空时同步标签索引；
+编辑器不猜测业务消息等级，也不反向依赖宿主日志、国际化或配置模块。
+
+`TinaCodeViewer(state, modifier, selectable = true)` 可启用只读长按选词、拖动手柄、全选和复制，复用编辑器的行布局缓存、选区绘制与剪贴板组件；不会创建 IME 输入宿主，也没有剪切、粘贴或 LSP 菜单。默认 `selectable = false` 保持代码围栏的滚动预览行为。可选视图释放时清除其选区和放大镜。
+
+需要日志等逐行配色时，可设置 `state.lineForegroundColors[line]`；指定颜色覆盖该逻辑行正文，包含软换行续段，未指定时仍使用原有语法高亮。文档所有者负责与标签一起重索引、清空，并在外部裁剪文本时调整仍存续的选区。
+
 ## Tree-sitter 初始化
 
 `TreeSitterLanguageRegistry.resolveLanguage()` 会在初始化任何语法绑定类之前加载核心

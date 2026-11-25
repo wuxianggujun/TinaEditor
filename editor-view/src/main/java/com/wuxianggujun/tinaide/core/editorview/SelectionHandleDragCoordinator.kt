@@ -35,7 +35,8 @@ internal class SelectionHandleDragCoordinator(
         onActiveHandleChanged: (SelectionHandleKind?) -> Unit,
         onContextMenuVisibilityChanged: (Boolean) -> Unit,
         onContextMenuOffsetChanged: (IntOffset) -> Unit,
-        cancelPendingCompletionRequest: () -> Unit
+        cancelPendingCompletionRequest: () -> Unit,
+        followExternalSelection: Boolean = false,
     ) {
         while (true) {
             val down = awaitFirstPointerDown(pass = PointerEventPass.Initial)
@@ -84,7 +85,8 @@ internal class SelectionHandleDragCoordinator(
                     touchSlopPx = touchSlopPx,
                     density = density,
                     textPaint = textPaint,
-                    onActiveHandleChanged = { kind -> onActiveHandleChanged(kind) }
+                    onActiveHandleChanged = { kind -> onActiveHandleChanged(kind) },
+                    followExternalSelection = followExternalSelection,
                 )
                 if (menuOffset != null) {
                     onContextMenuOffsetChanged(menuOffset)
@@ -108,7 +110,8 @@ internal class SelectionHandleDragCoordinator(
         touchSlopPx: Float,
         density: Density,
         textPaint: Paint,
-        onActiveHandleChanged: (SelectionHandleKind) -> Unit
+        onActiveHandleChanged: (SelectionHandleKind) -> Unit,
+        followExternalSelection: Boolean = false,
     ): IntOffset? {
         val edgeAutoScrollZonePx = with(density) { 32.dp.toPx() }
         val verticalAutoScrollStepPx = (state.lineHeightPx * 0.85f).coerceAtLeast(1f)
@@ -122,6 +125,11 @@ internal class SelectionHandleDragCoordinator(
                 "pointer=(${down.position.x.toInt()},${down.position.y.toInt()})"
         )
         down.consume()
+        if (followExternalSelection) {
+            val range = state.selectionRange ?: return null
+            state.selectRangeFromHandleDrag(fixedAnchorOffset,
+                if (handleKind == SelectionHandleKind.START) range.start else range.end)
+        }
         val touchSlopSquared = touchSlopPx * touchSlopPx
         var dragMovedEnough = false
         var currentHandleKind = handleKind
@@ -211,17 +219,19 @@ internal class SelectionHandleDragCoordinator(
                 )
                 val dragOffset = state.textBuffer.positionToOffset(line, column)
 
+                // Streaming read-only documents may remove a prefix while a handle is held.
+                val activeAnchorOffset = if (followExternalSelection) state.selectionRange?.anchor ?: break else fixedAnchorOffset
                 // 句柄跨越 anchor 时 flip（对齐 Sora 行为），避免视觉上的"句柄跳边"。
                 val desiredKind = when (handleKind) {
                     SelectionHandleKind.START ->
-                        if (dragOffset <= fixedAnchorOffset) {
+                        if (dragOffset <= activeAnchorOffset) {
                             SelectionHandleKind.START
                         } else {
                             SelectionHandleKind.END
                         }
 
                     SelectionHandleKind.END ->
-                        if (dragOffset >= fixedAnchorOffset) {
+                        if (dragOffset >= activeAnchorOffset) {
                             SelectionHandleKind.END
                         } else {
                             SelectionHandleKind.START
@@ -242,7 +252,7 @@ internal class SelectionHandleDragCoordinator(
                     // 关键：selectRange 会把 cursorOffset 设置为 endOffset。
                     // 句柄拖拽时 end 必须是 dragOffset，否则光标/自动对齐会锁在另一端，造成跳动。
                     state.selectRangeFromHandleDrag(
-                        startOffset = fixedAnchorOffset,
+                            startOffset = activeAnchorOffset,
                         endOffset = dragOffset
                     )
 

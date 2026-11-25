@@ -98,7 +98,8 @@ internal fun EditorSelectionContextMenu(
     onHover: () -> Unit,
     onDismiss: () -> Unit,
     editorActions: List<EditorContextMenuActionId> = emptyList(),
-    onEditorAction: (EditorContextMenuActionId) -> Unit = {}
+    onEditorAction: (EditorContextMenuActionId) -> Unit = {},
+    readOnly: Boolean = false,
 ) {
     if (!visible) return
 
@@ -144,7 +145,7 @@ internal fun EditorSelectionContextMenu(
             colors = popupColors,
             modifier = Modifier
                 .testTag(SELECTION_CONTEXT_MENU_TAG)
-                .width(selectionToolbarWidth)
+                .width(if (readOnly) selectionToolbarButtonSize * 2 + 8.dp else selectionToolbarWidth)
                 .heightIn(min = selectionToolbarHeight)
         ) {
             FlowRow(
@@ -172,53 +173,55 @@ internal fun EditorSelectionContextMenu(
                     modifier = Modifier.width(selectionToolbarButtonSize),
                     onClick = onCopy
                 )
-                EditorContextMenuIconAction(
-                    title = stringResource(R.string.editor_context_menu_cut),
-                    icon = Icons.Default.ContentCut,
-                    tag = SELECTION_CONTEXT_MENU_CUT_ACTION_TAG,
-                    keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.Cut,
-                    enabled = selectedText != null,
-                    popupColors = popupColors,
-                    modifier = Modifier.width(selectionToolbarButtonSize),
-                    onClick = onCut
-                )
-                EditorContextMenuIconAction(
-                    title = stringResource(R.string.editor_context_menu_paste),
-                    icon = Icons.Default.ContentPaste,
-                    tag = SELECTION_CONTEXT_MENU_PASTE_ACTION_TAG,
-                    keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.Paste,
-                    popupColors = popupColors,
-                    modifier = Modifier.width(selectionToolbarButtonSize),
-                    onClick = onPaste
-                )
-                EditorContextMenuMoreAction(
-                    expanded = moreMenuExpanded,
-                    keyboardSelectedAction = keyboardSelectedAction,
-                    popupColors = popupColors,
-                    hasCodeActions = hasCodeActions,
-                    hoverEnabled = hoverEnabled,
-                    peekDefinitionEnabled = peekDefinitionEnabled,
-                    gotoDefinitionEnabled = gotoDefinitionEnabled,
-                    findReferencesEnabled = findReferencesEnabled,
-                    gotoTypeDefinitionEnabled = gotoTypeDefinitionEnabled,
-                    gotoImplementationEnabled = gotoImplementationEnabled,
-                    codeActionsEnabled = codeActionsEnabled,
-                    renameSymbolEnabled = renameSymbolEnabled,
-                    switchHeaderSourceEnabled = switchHeaderSourceEnabled,
-                    modifier = Modifier.width(selectionToolbarButtonSize),
-                    onExpandedChange = { moreMenuExpanded = it },
-                    onPeekDefinition = onPeekDefinition,
-                    onGotoDefinition = onGotoDefinition,
-                    onFindReferences = onFindReferences,
-                    onGotoTypeDefinition = onGotoTypeDefinition,
-                    onGotoImplementation = onGotoImplementation,
-                    onCodeActions = onCodeActions,
-                    onRenameSymbol = onRenameSymbol,
-                    onSwitchHeaderSource = onSwitchHeaderSource,
-                    onHover = onHover,
-                    editorActions = editorActions,
-                    onEditorAction = onEditorAction
-                )
+                if (!readOnly) {
+                    EditorContextMenuIconAction(
+                        title = stringResource(R.string.editor_context_menu_cut),
+                        icon = Icons.Default.ContentCut,
+                        tag = SELECTION_CONTEXT_MENU_CUT_ACTION_TAG,
+                        keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.Cut,
+                        enabled = selectedText != null,
+                        popupColors = popupColors,
+                        modifier = Modifier.width(selectionToolbarButtonSize),
+                        onClick = onCut
+                    )
+                    EditorContextMenuIconAction(
+                        title = stringResource(R.string.editor_context_menu_paste),
+                        icon = Icons.Default.ContentPaste,
+                        tag = SELECTION_CONTEXT_MENU_PASTE_ACTION_TAG,
+                        keyboardSelected = keyboardSelectedAction == EditorContextMenuActionId.Paste,
+                        popupColors = popupColors,
+                        modifier = Modifier.width(selectionToolbarButtonSize),
+                        onClick = onPaste
+                    )
+                    EditorContextMenuMoreAction(
+                        expanded = moreMenuExpanded,
+                        keyboardSelectedAction = keyboardSelectedAction,
+                        popupColors = popupColors,
+                        hasCodeActions = hasCodeActions,
+                        hoverEnabled = hoverEnabled,
+                        peekDefinitionEnabled = peekDefinitionEnabled,
+                        gotoDefinitionEnabled = gotoDefinitionEnabled,
+                        findReferencesEnabled = findReferencesEnabled,
+                        gotoTypeDefinitionEnabled = gotoTypeDefinitionEnabled,
+                        gotoImplementationEnabled = gotoImplementationEnabled,
+                        codeActionsEnabled = codeActionsEnabled,
+                        renameSymbolEnabled = renameSymbolEnabled,
+                        switchHeaderSourceEnabled = switchHeaderSourceEnabled,
+                        modifier = Modifier.width(selectionToolbarButtonSize),
+                        onExpandedChange = { moreMenuExpanded = it },
+                        onPeekDefinition = onPeekDefinition,
+                        onGotoDefinition = onGotoDefinition,
+                        onFindReferences = onFindReferences,
+                        onGotoTypeDefinition = onGotoTypeDefinition,
+                        onGotoImplementation = onGotoImplementation,
+                        onCodeActions = onCodeActions,
+                        onRenameSymbol = onRenameSymbol,
+                        onSwitchHeaderSource = onSwitchHeaderSource,
+                        onHover = onHover,
+                        editorActions = editorActions,
+                        onEditorAction = onEditorAction
+                    )
+                }
             }
         }
     }

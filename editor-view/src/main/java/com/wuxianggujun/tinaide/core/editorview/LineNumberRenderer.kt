@@ -101,7 +101,7 @@ class LineNumberRenderer(
                         size = Size(stripe.width, stripe.height)
                     )
                 }
-                val decoration = decorations[line]
+                val decoration = if (state.config.gutterMode == EditorGutterMode.DEFAULT) decorations[line] else null
                 val hasBreakpoint = decoration?.breakpoint == true
                 val hasBookmark = decoration?.bookmark == true
 

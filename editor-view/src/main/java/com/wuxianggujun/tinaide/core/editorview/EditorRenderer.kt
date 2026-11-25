@@ -56,6 +56,7 @@ internal class EditorRenderer(
     private var cachedHitZonesTextSize = 0f
     private var cachedHitZonesLineCount = 0
     private var cachedHitZonesShowLineNumbers = false
+    private var cachedHitZonesGutterMode = EditorGutterMode.DEFAULT
     private var cachedHitZonesTypeface: Typeface? = null
     private var cachedHitZones: EditorHitZones? = null
 
@@ -236,11 +237,13 @@ internal class EditorRenderer(
         val textSize = lineNumberPaint.textSize
         val lineCount = state.textBuffer.lineCount
         val showLineNumbers = state.config.showLineNumbers
+        val gutterMode = state.config.gutterMode
         val cached = cachedHitZones
         if (cached != null &&
             textSize == cachedHitZonesTextSize &&
             lineCount == cachedHitZonesLineCount &&
             showLineNumbers == cachedHitZonesShowLineNumbers &&
+            gutterMode == cachedHitZonesGutterMode &&
             lineNumberPaint.typeface === cachedHitZonesTypeface
         ) {
             return cached
@@ -253,7 +256,7 @@ internal class EditorRenderer(
         )
         lineNumberPaint.getFontMetrics(reusableFontMetrics)
         val lineHeightPx = (reusableFontMetrics.descent - reusableFontMetrics.ascent + reusableFontMetrics.leading).coerceAtLeast(1f)
-        val gutterEndX = lineNumberWidth + gutterRenderer.widthForLineHeight(lineHeightPx)
+        val gutterEndX = lineNumberWidth + gutterRenderer.widthForMode(gutterMode, lineHeightPx, lineNumberPaint)
         // 对齐 Sora 官方 CodeEditor#measureTextRegionOffset()：
         // 行号宽度 + 侧边区域宽度 + divider 左右边距 + divider 宽度。
         val textStartX = gutterEndX + dividerMarginLeftPx + dividerWidthPx + dividerMarginRightPx
@@ -265,6 +268,7 @@ internal class EditorRenderer(
         cachedHitZonesTextSize = textSize
         cachedHitZonesLineCount = lineCount
         cachedHitZonesShowLineNumbers = showLineNumbers
+        cachedHitZonesGutterMode = gutterMode
         cachedHitZonesTypeface = lineNumberPaint.typeface
         cachedHitZones = result
         return result
@@ -424,6 +428,10 @@ internal class EditorRenderer(
         gutterRenderer.draw(
             this, frameContext.state, lineNumberWidth,
             frameContext.visibleLines, frameContext.scrollOffsetPx
+        )
+        gutterRenderer.drawLabels(
+            this, frameContext.state, lineNumberPaint, lineNumberWidth, gutterWidth,
+            frameContext.visibleLines, frameContext.scrollOffsetPx,
         )
         drawLine(
             color = scheme.gutterDivider,

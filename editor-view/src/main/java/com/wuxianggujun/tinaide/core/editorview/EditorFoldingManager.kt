@@ -352,7 +352,7 @@ class EditorFoldingManager internal constructor(
             if (line in startLines) return@forEach
             val existing = host.gutterDecorations[line] ?: return@forEach
             val updated = existing.copy(foldable = false)
-            if (updated.breakpoint || updated.bookmark || updated.hasDiagnostic) {
+            if (updated.breakpoint || updated.bookmark || updated.hasDiagnostic || updated.label != null) {
                 host.gutterDecorations[line] = updated
             } else {
                 host.gutterDecorations.remove(line)
